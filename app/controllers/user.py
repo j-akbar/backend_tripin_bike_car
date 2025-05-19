@@ -36,6 +36,22 @@ async def create_user(request: schemas.User, db: Session = Depends(get_db)):
     except:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad Request")
     
+@router.post("/byphone/", status_code =status.HTTP_201_CREATED, summary="Create the user by phone")
+async def create_user(request: schemas.User, db: Session = Depends(get_db)):
+    try:
+        check_user_email = db.query(models.User).filter(models.User.email == request.email).first() is not None
+        if check_user_email:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email is already exist")
+        
+        password_hashing = PasswordHashing()
+        hashed_password = password_hashing.hash_password(password=request.password)
+        new_user = models.User(name = request.name, email = request.email, password = hashed_password, added_on = datetime.now())
+        db.add(new_user)
+        db.commit()
+        return "Successfully created a user"
+    except:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad Request")
+    
 @router.put("/{user_id}/", status_code=status.HTTP_202_ACCEPTED)
 async def update_user(user_id:int, request:schemas.UserUpdate, db:Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     user = db.query(models.User).filter(models.User.id == user_id)

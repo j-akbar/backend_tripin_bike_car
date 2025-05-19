@@ -37,8 +37,14 @@ A basic boilerplate for FastAPI CRUD along with JWT Token Authentication. <br/>
 
 #### 4. Run Application
 ```bash
-  uvicorn app.main:app --reload --port 8000
+  uvicorn app.main:app --reload --port 5005
 ```
+
+#### 5. Open Documentation
+```bash
+  http://localhost:5005/docs
+```
+
 ## Built with
 
 - [FastAPI](https://fastapi.tiangolo.com/)
