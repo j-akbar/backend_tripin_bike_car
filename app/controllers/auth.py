@@ -5,11 +5,14 @@ from passlib.context import CryptContext
 from app.data import models
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
-SECRET_KEY = "fastapicrud"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")) if int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")) else 30
 security = HTTPBearer()
 
 
