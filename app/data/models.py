@@ -48,7 +48,7 @@ class Order(Base):
     waktu = Column(Float)
     kendaraan = Column(String)
     vehicle_type_ordered = Column(Integer, default=0) # 0 = bike, 1 = car, 2 = truck, etc.
-    status = Column(Integer, default=0)
+    status = Column(Integer, default=0) # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
 
@@ -131,7 +131,7 @@ class DriverCoords(Base):
     address = Column(String, default="") # Alamat lengkap e.g. Jl. Merdeka No. 1, RT 01/RW 02, Kelurahan Merdeka
     vehicle_type = Column(Integer, default=0) # 0 = bike, 1 = car, 2 = truck, etc.
     vehicle_number = Column(String, default="")
-    priority = Column(Integer, default=0) # 0 = prajurit, 1 = kapten, 2 = mayor, 3 = jenderal, etc.
+    priority = Column(Integer, default=10) # 10=prajurit, 9=kopral, 5=sersan, 4=letnan, 3=kapten 2=kolonel, 1=mayor, 0=jenderal, etc.
     progress_order = Column(Boolean, default=False)  # 0 = belum ada order, 1 = sedang proses order
     active = Column(Boolean, default=True)  # 0 = sedang tidak aktif, 1 = sedang aktif
     last_active = Column(DateTime(timezone=True), default=datetime.now)
@@ -149,9 +149,11 @@ class OrderAssigned(Base):
     id_order_pickup = Column(Integer)
     id_driver = Column(Integer)
     id_user = Column(Integer)
+    vehicle_type = Column(Integer, default=0)  # 0 = bike, 1 = car, 2 = truck, etc.
     waiting_time = Column(Float, default=0.0)  # waktu tunggu driver pickup customer
     waktu_jemput = Column(Float, default=0.0)   # waktu jemput driver ke user
     waktu_antar = Column(Float, default=0.0)  # waktu antar customer ke lokasi destinasi
+    url = Column(String, default="") 
     status = Column(Integer, default=0)  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
     is_active = Column(Boolean, default=False)  # 0 = tidak aktif, 1 = aktif
     created_on = Column(DateTime(timezone=True))

@@ -23,38 +23,61 @@ def get_orders(db: Session = Depends(get_db)):
 @router.post("/", status_code =status.HTTP_201_CREATED, summary="Create order from user")
 def create_order(request: schemas.Order, db: Session = Depends(get_db)):
     try:
-        check_order = db.query(models.Order).filter(
+        # Check if an order already exists for the user with the same coordinates and status
+        check_active_order = db.query(models.Order).filter(
             models.Order.id_user == request.id_user,
             models.Order.coord_ke == request.coord_ke,
-            models.Order.status == 0  # Assuming status 0 means 'new' or 'pending'
+            models.Order.status == 1  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
         ).first()
-        if check_order:
-            for key, value in request.model_dump().items():
-                setattr(check_order, key, value)
-            check_order.updated_on = datetime.now()
-            db.commit()
-            cursor = db.execute(
-                f"SELECT id from orders WHERE id_user = {request.id_user} AND DATE(created_on) = DATE('now', 'localtime') ORDER BY id ASC LIMIT 1")
-            for row in cursor.fetchall():
-                cursor.close()
-            return ({ "id": row[0], "status_code": status.HTTP_200_OK }) # "Successfully updated order"
+        if check_active_order:
+            return ({ "id": check_active_order.id, "status_code": status.HTTP_200_OK, "message": "There is an active order in progress for this user and coordinates." })
         else:
-            new_order = models.Order(**request.model_dump(), created_on=datetime.now())
-            db.add(new_order)
-            db.commit()
-            cursor = db.execute(
-                f"SELECT id from orders WHERE id_user = {request.id_user} AND DATE(created_on) = DATE('now', 'localtime') ORDER BY id ASC")
-            for row in cursor.fetchall():
-                cursor.close()
-            return ({ "id": row[0], "status_code": status.HTTP_201_CREATED }) # "Successfully created an order"
+            check_order = db.query(models.Order).filter(
+                models.Order.id_user == request.id_user,
+                models.Order.coord_ke == request.coord_ke,
+                models.Order.status == 0  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+            ).first()
+            if check_order:
+                check_order.updated_on = datetime.now()
+                db.commit()
+                return ({ "id": check_order.id, "status_code": status.HTTP_200_OK, "message": "Successfully updated order" })
+            else:
+                new_order = models.Order(**request.model_dump(), created_on=datetime.now())
+                db.add(new_order)
+                db.commit()
+                return ({ "id": new_order.id, "status_code": status.HTTP_201_CREATED, "message": "Successfully created an order" })
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e}")
+
+def reverse_name_words(name):
+    words = name.split()  # Split the name into a list of words
+    reversed_words = words[::-1]  # Reverse the list of words
+    return " ".join(reversed_words) # Join the reversed words back into a string
 
 @router.get("/get-order-user/{user_id}/", status_code=status.HTTP_200_OK, summary="Get the list of all orders by user")
 def get_orders_by_user(user_id: int, db: Session = Depends(get_db)):
     orders = db.query(models.Order).filter(models.Order.id_user == user_id).all()
     if orders:
-        return orders
+        result = []
+        for order in orders:
+            city_name = order.city.replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat').replace('Java', 'Jawa')
+            if order.city == "North Jakarta":
+                city_name = "Jakarta Utara"
+            elif order.city == "South Jakarta":
+                city_name = "Jakarta Selatan"
+            elif order.city == "East Jakarta":
+                city_name = "Jakarta Timur"
+            elif order.city == "West Jakarta":
+                city_name = "Jakarta Barat"
+            reversed_city_name = reverse_name_words(city_name)
+
+            province_name = order.province.replace('Java', 'Jawa').replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat')
+            reversed_province_name = reverse_name_words(province_name)
+            result.append({
+                "label": f"{order.label} ({order.district})",
+                "description": f"{order.address}, {order.locality} ({order.district}) {reversed_city_name} <b>{reversed_province_name}</b> {order.postcode}"
+            })
+        return result
     else:
         return ({ "status_code": status.HTTP_404_NOT_FOUND, "detail": f"Not found order information for user_id {user_id}" })
     # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found order information for user_id {user_id}")

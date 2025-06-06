@@ -143,7 +143,7 @@ class DriverCoords(BaseModel):
     address: str = ""
     vehicle_type: int = 0
     vehicle_number: str = ""
-    priority: int = 0
+    priority: int = 10
     progress_order: bool = False    # 0 = belum ada order, 1 = sedang proses order
     active: bool = True
     last_active: Optional[datetime] = None # Optional[datetime] = datetime.now()
@@ -169,10 +169,20 @@ class DriverCoordsOut(BaseModel):
     neighborhood: str = ""
     address: str = ""
 
+class ProcessAssign(BaseModel):
+    id_user: int
+    vehicle_type: int
+    country_code: str = "ID"
+    region: str = "Banten"
+    url: str = ""  # URL for the latest location of the driver
+
 class OrderAssigned(BaseModel):
     id_order_pickup: int
     id_driver: int
     id_user: int
+    vehicle_type: int = 0  # 0 = bike, 1 = car, 2 = truck, etc.
+    latest_url: str = ""
+    waiting_time: float = 0.0  # waktu tunggu driver pickup customer
     status: int
     is_active: bool = False  # 0 = tidak aktif, 1 = aktif
 

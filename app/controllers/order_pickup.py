@@ -11,35 +11,34 @@ import requests
 
 router = APIRouter()
 
-@router.post("/", status_code=status.HTTP_201_CREATED, summary="Create order pickup from user")
+@router.post("/", status_code=status.HTTP_200_OK, summary="Create order pickup from user")
 def create_order_pickup(request: schemas.OrderPickup, db: Session = Depends(get_db)):
     try:
-        check_order = db.query(models.OrderPickup).filter(
+        # check active order pickup
+        active_order = db.query(models.OrderPickup).filter(
             models.OrderPickup.id_user == request.id_user,
-            models.OrderPickup.status == 0,     # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-            models.OrderPickup.is_pickup == 0,  # 0 = belum pickup, 1 = sudah di pickup oleh driver
-            models.OrderPickup.running == 0,    # 0 = belum jalan, 1 = sudah jalan
-            models.OrderPickup.finished == 0,    # 0 = belum selesai, 1 = sudah selesai
+            models.OrderPickup.status == 1,     # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+            models.OrderPickup.id_driver != 0,  # 0 = belum ada driver yang assigned, >0 = sudah ada driver yang assigned
         ).first()
-        if check_order:
-            for key, value in request.model_dump().items():
-                setattr(check_order, key, value)
-            check_order.updated_on = datetime.now()
-            db.commit()
-            cursor = db.execute(
-                f"SELECT * from order_pickup WHERE id_user = {request.id_user} AND id_order = {request.id_order} AND DATE(created_on) = DATE('now', 'localtime') ORDER BY id ASC LIMIT 1")
-            for row in cursor.fetchall():
-                cursor.close()
-            return row  # "Successfully updated order pickup"
-        else:
-            new_order_pickup = models.OrderPickup(**request.model_dump(), created_on=datetime.now())
-            db.add(new_order_pickup)
-            db.commit()
-            cursor = db.execute(
-                f"SELECT * from order_pickup WHERE id_user = {request.id_user} AND id_order = {request.id_order} AND DATE(created_on) = DATE('now', 'localtime') ORDER BY id ASC LIMIT 1")
-            for row in cursor.fetchall():
-                cursor.close()
-            return row  # "Successfully created an order pickup"
+        if active_order:
+            return active_order
+        else:   # jika tidak ada order pickup yang sedang aktif, maka cek apakah ada order pickup baru
+            check_order = db.query(models.OrderPickup).filter(
+                models.OrderPickup.id_user == request.id_user,
+                models.OrderPickup.status == 0,     # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+                models.OrderPickup.is_pickup == 0,  # 0 = belum pickup, 1 = sudah di pickup oleh driver
+                models.OrderPickup.running == 0,    # 0 = belum jalan, 1 = sudah jalan
+                models.OrderPickup.finished == 0,    # 0 = belum selesai, 1 = sudah selesai
+            ).first()
+            if check_order:
+                check_order.updated_on = datetime.now()
+                db.commit()
+                return check_order  # "Successfully updated order pickup"
+            else:
+                new_order_pickup = models.OrderPickup(**request.model_dump(), created_on=datetime.now())
+                db.add(new_order_pickup)
+                db.commit()
+                return new_order_pickup  # "Successfully created an order pickup"
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e}")
     

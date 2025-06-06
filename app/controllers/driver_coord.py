@@ -15,7 +15,7 @@ def create_driver_coords(driver_coords: schemas.DriverCoords, db: Session = Depe
     try:
         check_driver_coords = db.query(models.DriverCoords).filter(
             models.DriverCoords.id_driver == driver_coords.id_driver,
-            # models.DriverCoords.place_id == driver_coords.place_id
+            models.DriverCoords.status == 0
         ).first()
         if check_driver_coords:
             for key, value in driver_coords.model_dump().items():
@@ -66,7 +66,7 @@ def get_driver_coords_by_pickup(request: schemas.DriverCoordsOut, db: Session = 
                 OP.district = '{request.district}' OR OP.address = '{request.address}' OR 
                 OP.neighborhood = '{request.neighborhood}' OR OP.locality = '{request.locality}' OR 
                 OP.label = '{request.label}' OR OP.sublabel = '{request.sublabel}') 
-                ORDER BY DC.priority, DC.daily_order_count ASC LIMIT 20""").all()
+                ORDER BY DC.priority, DC.daily_order_count ASC LIMIT 100""").all()
         if cursor:
             return cursor
         if not cursor:
