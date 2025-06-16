@@ -49,6 +49,7 @@ class Order(Base):
     kendaraan = Column(String)
     vehicle_type_ordered = Column(Integer, default=0) # 0 = bike, 1 = car, 2 = truck, etc.
     status = Column(Integer, default=0) # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+    status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
 
@@ -91,6 +92,7 @@ class OrderPickup(Base): # order tercatat hanya detail order pickup
     kendaraan = Column(String)
     vehicle_type_ordered = Column(Integer, default=0) # 0 = bike, 1 = car, 2 = truck, etc.
     status = Column(Integer, default=0) # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+    status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
     canceled_reason = Column(String, default="") # Alasan pembatalan order
     promo = Column(String, default="") # e.g. promo code, discount code, etc.
     is_pickup = Column(Integer, default=0)  # 0 = belum pickup, 1 = driver sudah tiba, 2 = sudah di pickup oleh driver
@@ -133,7 +135,7 @@ class DriverCoords(Base):
     vehicle_number = Column(String, default="")
     priority = Column(Integer, default=10) # 10=prajurit, 9=kopral, 5=sersan, 4=letnan, 3=kapten 2=kolonel, 1=mayor, 0=jenderal, etc.
     progress_order = Column(Boolean, default=False)  # 0 = belum ada order, 1 = sedang proses order
-    active = Column(Boolean, default=True)  # 0 = sedang tidak aktif, 1 = sedang aktif
+    active = Column(Boolean, default=True)  # toogle switch ditrigger dari app driver | 0 = tidak aktif, 1 = sedang aktif
     last_active = Column(DateTime(timezone=True), default=datetime.now)
     daily_order_count = Column(Integer, default=0) # Count all orders today
     daily_completed_count = Column(Integer, default=0) # Count of orders completed today

@@ -5,3 +5,6 @@ SQLAlchemy
 python-jose
 passlib[bcrypt]
 pyjwt
+python-socketio
+redis
+websockets

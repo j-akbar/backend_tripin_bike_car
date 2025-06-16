@@ -18,6 +18,26 @@ API_KEY_OPENROUTE_2 = os.getenv("API_KEY_OPENROUTE_2", "5b3ce3597851110001cf6248
 
 router = APIRouter()
 
+def set_status_nearest(param_assign, sts, db):
+    # db: Session = Depends(get_db)
+    # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
+    order_pickup = db.query(models.OrderPickup).filter(
+    models.OrderPickup.id_user == param_assign.id_user
+    ).first()
+    order_pickup.updated_on = datetime.now()
+    order_pickup.status_nearest = sts
+
+    # update status_nearest orders
+    orders = db.query(models.Order).filter(
+        models.Order.id_user == order_pickup.id_user
+    ).all()
+    for order in orders:
+        order.status_nearest = sts
+        order.updated_on = datetime.now()
+    db.commit()
+    return order_pickup
+
+
 @router.post("/process-pickup-nearest-driver/", status_code=status.HTTP_200_OK, summary="Process get all nearest driver for pickup triggered by user")
 def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depends(get_db)):
     # Logic to create an assign order
@@ -34,6 +54,7 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
         if assigned_orders:
             return assigned_orders
         else:
+            # check data order pickup yang dibuat oleh user
             order_pickup = db.query(models.OrderPickup).filter(
             models.OrderPickup.id_user == param_assign.id_user,
             models.OrderPickup.status == 0,
@@ -68,15 +89,15 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
                 OP.label = '{order_pickup.label}' OR OP.sublabel = '{order_pickup.sublabel}') 
                 ORDER BY DC.priority, DC.daily_order_count, DC.daily_cancelled_count ASC""").all()
             if not cursor:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver coordinates not found")
+                print(f"status ke 1 {param_assign}")
+                set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
             else:
                 jumlah_driver = [len(cursor),len(cursor)] # mendapatkan jumlah driver dihitung dari 0
                 lon_lat_driver = [] # e.g: [['106.734242608533', '-6.31829872108153'], ['106.738404508861', '-6.2907219825044']]
                 for row in cursor:
                     lon_lat_driver.append([row.lon, row.lat])
                 lon_lat_driver.append([order_pickup.lon, order_pickup.lat]) # menambah destination pickup ke array log_lan_driver
-                # print(lon_lat_driver)
-                # print(jumlah_driver)
                 # Assuming order_pickup has the necessary attributes like lon and lat
                 url = f"{API_HOST_OPENROUTE}/v2/matrix/driving-car"
                 headers = {
@@ -100,22 +121,10 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
                     if not durations or len(durations) == 0:
                         return {"status_code": status.HTTP_404_NOT_FOUND, "detail": "No durations found in the response"}
                     for i in range(len(durations)):
-                        print(f'duration {durations[i]}')
+                        # print(f'duration {durations[i]}')
                         # print(f"Index: {i}, Value: {durations[i]}")
                         # print(f"Duration for driver {i}: {durations[i][0]} seconds")
-                        if durations[i][0] > 0.0 and durations[i][0] <= 300.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (0-5 minutes)")
-                            # check if the driver is already assigned to this order
-                            # check_assigned = db.query(models.OrderAssigned).filter(
-                            #     models.OrderAssigned.id_user == order_pickup.id_user,
-                            #     models.OrderAssigned.id_driver == cursor[i].id_driver,
-                            #     models.OrderAssigned.status == 1,  # Assuming status 0 means 'new' or 'pending'
-                            #     models.OrderAssigned.is_active == 1,  # Assuming 1 means active
-                            # ).order_by(models.OrderAssigned.created_on.desc()
-                            # ).all()
-                            # for assignment in check_assigned:
-                            #     db.delete(assignment)
-                            # db.commit()
+                        if durations[i][0] > 0.0 and durations[i][0] <= 300.0:  # 0-5 minutes
                             # Create a new assignment for the driver
                             new_assignment = models.OrderAssigned(
                                 id_order_pickup=order_pickup.id,
@@ -202,8 +211,8 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
                                 # "user_lat": cursor[i].user_lat,
                                 "waktu_jemput": durations[i][0],
                             }
-                        elif durations[i][0] > 300.0 and durations[i][0] <= 600.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (0-5 minutes)")
+                        elif durations[i][0] > 300.0 and durations[i][0] <= 600.0:  # 5-10 minutes
+                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (5-10 minutes)")
                             # check if the driver is already assigned to this order
                             # check_assigned = db.query(models.OrderAssigned).filter(
                             #     models.OrderAssigned.id_user == order_pickup.id_user,
@@ -273,17 +282,25 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
                                 "active": cursor[i].active,
                                 "waktu_jemput": durations[i][0],
                             }
-                        elif durations[i][0] > 600.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (more than 10 minutes)")
-                            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver belum tersedia dilokasi anda")
-                            # continue
-                        # cursor.close()
+                        elif durations[i][0] > 600.0 and durations[i][0] <= 1800.0: # 10-30 minutes
+                            print(f"status ke 2 {param_assign}")
+                            set_sts_nearest_order = set_status_nearest(param_assign, 3, db)
+                            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
+                        elif durations[i][0] > 1800.0 and durations[i][0] <= 7200.0: # 30-120 minutes
+                            print(f"status ke 3 {param_assign}")
+                            set_sts_nearest_order = set_status_nearest(param_assign, 4, db)
+                            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
                     # return {"status_code": status.HTTP_200_OK, "detail": "Successfully fetched data from OpenRouteService"}
                 else:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error fetching data from OpenRouteService")
+                    print(f"status ke 4 {param_assign}")
+                    set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{set_sts_nearest_order}")
                     # return {"status_code": response.status_code, "detail": "Error fetching data from OpenRouteService"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e} Proses assign sudah selesai, silahkan tunggu driver datang menjemput anda")
+        print(f"status ke 5")
+        set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{set_sts_nearest_order}")
+        # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e} Proses assign sudah selesai, silahkan tunggu driver datang menjemput anda")
 
 @router.get("/", status_code=status.HTTP_200_OK, summary="Get all assigned orders")
 def get_assign_order(db: Session = Depends(get_db)):
@@ -337,35 +354,31 @@ def get_assigned_driver(id_user: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
-@router.delete("/{id_user}/", status_code=status.HTTP_202_ACCEPTED, summary="Delete assigned order by user ID")
+@router.delete("/{id_user}/", status_code=status.HTTP_202_ACCEPTED, summary="Delete all order by id_user")
 def delete_assign_order(id_user: int, db: Session = Depends(get_db)):
     try:
+        # delete order_pickup by id_user
+        order_pickup = db.query(models.OrderPickup).filter(models.OrderPickup.id_user == id_user).first()
+        db.delete(order_pickup)
+
         # delete order_assigned
-        assigned_orders = db.query(models.OrderAssigned).filter(models.OrderAssigned.id_user == id_user).all()
-        if not assigned_orders:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No assigned orders found for this user")
-        for assigned in assigned_orders:
-            db.delete(assigned)
+        assigned_orders = db.query(models.OrderAssigned).filter(models.OrderAssigned.id_user == id_user).first()
+        db.delete(assigned_orders)
 
         # delete all order by id_user
         orders = db.query(models.Order).filter(models.Order.id_user == id_user).all()
         for order in orders:
             db.delete(order)
 
-        # delete order_pickup by id_user
-        order_pickup = db.query(models.OrderPickup).filter(models.OrderPickup.id_user).all()
-        for pickup in order_pickup:
-            db.delete(pickup)
-
         # set status driver_coords
         driver_sts = db.query(models.DriverCoords).filter(
-            models.DriverCoords.id_driver == assigned_orders.id_driver,
-            models.DriverCoords.vehicle_type == assigned_orders.vehicle_type
+            models.DriverCoords.id_driver == order_pickup.id_driver,
+            models.DriverCoords.vehicle_type == order_pickup.vehicle_type_ordered
             ).first()
         if driver_sts:
             driver_sts.progress_order = 0
 
         db.commit()
-        return {"status_code": status.HTTP_202_ACCEPTED, "detail": "Successfully deleted assigned orders"}
+        return {"status_code": status.HTTP_202_ACCEPTED, "detail": "Successfully deleted all orders by id_user"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

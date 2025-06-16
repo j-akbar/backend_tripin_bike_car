@@ -59,7 +59,7 @@ def get_driver_coords_by_pickup(request: schemas.DriverCoordsOut, db: Session = 
                 JOIN driver_coords DC 
                 ON OP.vehicle_type_ordered = DC.vehicle_type AND OP.country_code = DC.country_code AND OP.region = DC.region 
                 WHERE OP.id_user = {request.id_user} AND OP.vehicle_type_ordered = {request.vehicle_type} AND 
-                DC.status = 1 AND DC.active = 1 AND DC.progress_order = 0 AND 
+                DC.status = 1 AND DC.active = 1 AND DC.is_active = 1 AND DC.progress_order = 0 AND 
                 OP.country_code = '{request.country_code}' AND OP.region = '{request.region}' AND 
                 OP.province = '{request.province}' AND 
                 ( OP.postcode = '{request.postcode}' OR OP.city = '{request.city}' OR 

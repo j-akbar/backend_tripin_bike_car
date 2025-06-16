@@ -71,6 +71,7 @@ class Order(BaseModel):
     kendaraan: str = ""
     vehicle_type_ordered: int = 0  # 0 = bike, 1 = car, 2 = truck, etc.
     status: int = 0
+    status_nearest: int = 0  # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
 
 class OrderPickup(BaseModel):
     id_order: int
@@ -109,6 +110,7 @@ class OrderPickup(BaseModel):
     kendaraan: str = ""
     vehicle_type_ordered: int = 0  # 0 = bike, 1 = car, 2 = truck, etc.
     status: int = 0 # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+    status_nearest: int = 0  # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
     canceled_reason: str = ""  # Alasan pembatalan order
     promo: str = ""
     is_pickup: int = 0  # 0 = belum pickup, 1 = driver sudah tiba, 2 = sudah di pickup oleh driver
@@ -145,7 +147,7 @@ class DriverCoords(BaseModel):
     vehicle_number: str = ""
     priority: int = 10
     progress_order: bool = False    # 0 = belum ada order, 1 = sedang proses order
-    active: bool = True
+    active: bool = True # toogle switch ditrigger dari app driver | 0 = tidak aktif, 1 = sedang aktif
     last_active: Optional[datetime] = None # Optional[datetime] = datetime.now()
     daily_order_count: int = 0  # Count all orders today
     daily_completed_count: int = 0  # Count of orders completed today
