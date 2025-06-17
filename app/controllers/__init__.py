@@ -7,6 +7,7 @@ from app.controllers.order_pickup import router as order_pickup_router
 from app.controllers.order_assigned import router as order_assigned_router
 from app.controllers.testingGraphhopper import router as testing_graphhopper_router
 from app.controllers.testingOpenRouteService import router as testing_open_route_service_router
+from app.controllers.autocomplete import router as autocomplete_service_router
 
 def include_routers(app):
     app.include_router(
@@ -31,6 +32,10 @@ def include_routers(app):
 
     app.include_router(
         order_assigned_router, prefix ="/api/v1/order_assigned", tags = ['Order Assigned']
+    )
+
+    app.include_router(
+        autocomplete_service_router, prefix = "/api/v1/autocomplete", tags = ['autocomplete searching location']
     )
 
     app.include_router(

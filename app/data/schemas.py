@@ -217,3 +217,10 @@ class TripBikeCar(BaseModel):
     vehicle_type: str = "bike"  # 0 = bike, 1 = car, 2 = truck, etc.
     # points_encoded: bool = False  # if True, the points are encoded in a compact format
     snap_prevention: str = "ferry"  # "ferry", "none", "all"
+
+class Autocomplete(BaseModel):
+    q: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    lang: str = "en"
+    country_code: str = "ID"
