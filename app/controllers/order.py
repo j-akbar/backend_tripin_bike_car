@@ -54,28 +54,57 @@ def reverse_name_words(name):
     reversed_words = words[::-1]  # Reverse the list of words
     return " ".join(reversed_words) # Join the reversed words back into a string
 
+def get_city(city):
+    if(city):
+        city_name = ""
+        if city == "North Jakarta":
+            city_name = "Jakarta Utara"
+        elif city == "South Jakarta":
+            city_name = "Jakarta Selatan"
+        elif city == "East Jakarta":
+            city_name = "Jakarta Timur"
+        elif city == "West Jakarta":
+            city_name = "Jakarta Barat"
+        else:
+            city_name = city.replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat').replace('Java', 'Jawa')
+        # reversed_city_name = reverse_name_words(city_name)
+        return city_name
+    else: return ''
+
+def get_province(province):
+    if(province):
+        province_name = province.replace('Java', 'Jawa').replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat')
+        # reversed_province_name = reverse_name_words(province_name)
+        return province_name
+    else: return ''
+
+
 @router.get("/get-order-user/{user_id}/", status_code=status.HTTP_200_OK, summary="Get the list of all orders by user")
 def get_orders_by_user(user_id: int, db: Session = Depends(get_db)):
     orders = db.query(models.Order).filter(models.Order.id_user == user_id).all()
     if orders:
         result = []
         for order in orders:
-            city_name = order.city.replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat').replace('Java', 'Jawa')
-            if order.city == "North Jakarta":
-                city_name = "Jakarta Utara"
-            elif order.city == "South Jakarta":
-                city_name = "Jakarta Selatan"
-            elif order.city == "East Jakarta":
-                city_name = "Jakarta Timur"
-            elif order.city == "West Jakarta":
-                city_name = "Jakarta Barat"
-            reversed_city_name = reverse_name_words(city_name)
+            city_name = get_city(order.city)
+            # if order.city == "North Jakarta":
+            #     city_name = "Jakarta Utara"
+            # elif order.city == "South Jakarta":
+            #     city_name = "Jakarta Selatan"
+            # elif order.city == "East Jakarta":
+            #     city_name = "Jakarta Timur"
+            # elif order.city == "West Jakarta":
+            #     city_name = "Jakarta Barat"
+            # else:
+            #     city_name = order.city.replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat').replace('Java', 'Jawa')
+            # reversed_city_name = reverse_name_words(city_name)
 
-            province_name = order.province.replace('Java', 'Jawa').replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat')
-            reversed_province_name = reverse_name_words(province_name)
+            # province_name = order.province.replace('Java', 'Jawa').replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat')
+            # reversed_province_name = reverse_name_words(province_name)
+            province_name = get_province(order.province)
+
             result.append({
                 "label": f"{order.label} ({order.district})",
-                "description": f"{order.address}, {order.locality} ({order.district}) {reversed_city_name} <b>{reversed_province_name}</b> {order.postcode}"
+                "description": f"{order.address}, {order.locality} ({order.district}) {city_name} <b>{province_name}</b> {order.postcode}"
             })
         return result
     else:

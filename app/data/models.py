@@ -23,12 +23,13 @@ class Order(Base):
     place_type = Column(String, default="") # e.g. N, W, S, etc.
     place_key = Column(String, default="") # e.g. amenity etc
     place_value = Column(String, default="") # e.g. Starbucks, restaurant, etc.
-    lat = Column(String)
-    lon = Column(String)
+    lat = Column(Float, default=0.0)
+    lon = Column(Float, default=0.0)
     country_code = Column(String, default="")
     country_name = Column(String, default="")
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="")
+    state = Column(String, default="")
     province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="")
     label = Column(String, default="")
@@ -49,7 +50,7 @@ class Order(Base):
     kendaraan = Column(String)
     vehicle_type_ordered = Column(Integer, default=0) # 0 = bike, 1 = car, 2 = truck, etc.
     status = Column(Integer, default=0) # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-    status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
+    status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned, 6 = state dan city tidak ditemukan, kesalahan query di cursor
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
 
@@ -64,12 +65,13 @@ class OrderPickup(Base): # order tercatat hanya detail order pickup
     place_type = Column(String, default="") # e.g. N, W, S, etc.
     place_key = Column(String, default="") # e.g. amenity etc
     place_value = Column(String, default="") # e.g. Starbucks, restaurant, etc.
-    lat = Column(String)
-    lon = Column(String)
+    lat = Column(Float, default=0.0) # Column(String)
+    lon = Column(Float, default=0.0)
     country_code = Column(String, default="")
     country_name = Column(String, default="")
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="")
+    state = Column(String, default="")
     province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="")
     label = Column(String, default="")
@@ -115,12 +117,13 @@ class DriverCoords(Base):
     place_type = Column(String, default="") # e.g. N, W, S, etc.
     place_key = Column(String, default="") # e.g. amenity etc
     place_value = Column(String, default="") # e.g. Starbucks, restaurant, etc.
-    lat = Column(String)
-    lon = Column(String)
+    lat = Column(Float, default=0.0)  # Column(String)
+    lon = Column(Float, default=0.0)  # Column(String)
     country_code = Column(String, default="") # ID, US, etc.
     country_name = Column(String, default="") # Indonesia, USA, etc.
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="") # Jawa Barat, DKI Jakarta, etc.
+    state = Column(String, default="")
     province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="") # Bandung, Jakarta, etc.
     label = Column(String, default="")

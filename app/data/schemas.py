@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, SkipValidation
 from datetime import datetime, date
 from typing import Optional
-from typing import Union
+from typing import Union, List, Dict, Tuple
 
 
 class User(BaseModel):
@@ -45,12 +45,13 @@ class Order(BaseModel):
     place_type: str = ""  # e.g. N, W, S, etc.
     place_key: str = ""  # e.g. amenity etc
     place_value: str = ""  # e.g. Starbucks, restaurant, etc.
-    lat: str = ""
-    lon: str = ""
+    lat: float = 0.0
+    lon: float = 0.0
     country_code: str = ""
     country_name: str = ""
     country_code_iso3: str = ""  # IDN, USA, etc.
     region: str = ""
+    state: str = ""
     province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
@@ -82,12 +83,13 @@ class OrderPickup(BaseModel):
     place_type: str = ""  # e.g. N, W, S, etc.
     place_key: str = ""  # e.g. amenity etc
     place_value: str = ""  # e.g. Starbucks, restaurant, etc.
-    lat: str = ""
-    lon: str = ""
+    lat: float = 0.0
+    lon: float = 0.0
     country_code: str = ""
     country_name: str = ""
     country_code_iso3: str = ""  # IDN, USA, etc.
     region: str = ""
+    state: str = ""
     province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
@@ -128,11 +130,12 @@ class DriverCoords(BaseModel):
     place_type: str = ""  # e.g. N, W, S, etc.
     place_key: str = ""  # e.g. amenity etc
     place_value: str = ""  # e.g. Starbucks, restaurant, etc.
-    lat: str = ""
-    lon: str = ""
+    lat: float = 0.0
+    lon: float = 0.0
     country_code: str = ""
     country_name: str = ""
     region: str = ""
+    state: str = ""
     province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
@@ -210,8 +213,8 @@ class TripBikeCar(BaseModel):
     type_trip: int = 0  # 0 = "sekarang", 1 = "reservasi"
     jarak_trip: float = 0.0  # Distance in meters for the trip
     waktu_trip: float = 0.0   # e.g 6572.795
-    pickup_lat: str = ""
-    pickup_lon: str = ""
+    pickup_lat: float = 0.0
+    pickup_lon: float = 0.0
     dropoff_lat: str = ""
     dropoff_lon: str = ""
     vehicle_type: str = "bike"  # 0 = bike, 1 = car, 2 = truck, etc.
@@ -224,3 +227,53 @@ class Autocomplete(BaseModel):
     lon: Optional[float] = None
     lang: str = "en"
     country_code: str = "ID"
+    # state: Optional[str] = None
+    # city: Optional[str] = None
+
+
+# response for photon based osm maps data
+# class InnerArray(BaseModel):
+# class PropertiesData(BaseModel):
+#     type: str # house, street, city
+#     place: Optional[str] = ""
+#     street: Optional[str] = ""
+#     housenumber: Optional[str] = ""
+#     streetnumber: Optional[str] = ""
+#     city: Optional[str] = ""
+#     district: Optional[str] = ""
+#     county: Optional[str] = "" # not sure if it ever appears
+#     state: Optional[str] = ""
+#     locality: Optional[str] = ""
+#     postcode: Optional[str] = ""
+#     country: Optional[str] = ""
+#     countrycode: Optional[str] = ""
+#     osm_key: str
+#     osm_value: str
+#     osm_type: str
+#     osm_id: str
+#     name: str
+#     extent: List[float] # = Field(..., min_length=4, max_length=4) # Define a field that is a list of floats with a fixed length
+#     class Config:
+#         # allow_population_by_field_name = True
+#         validate_assignment = True
+
+# class GeometryData(BaseModel):
+#     type: Optional[str] = ""
+#     coordinates: List[SkipValidation[float]] # = Field(..., min_length=2, max_length=2)
+#     # class Config:
+#     #     validate_assignment = False
+
+# class PhotonFeaturesData(BaseModel):
+#     type: str = 'Feature'
+#     # properties: List[str] # List[PropertiesData]
+#     # geometry: List[GeometryData]
+#     # class Config:
+#     #     orm_mode = True
+#         # validate_assignment = False
+
+# class PhotonGeojsonFeature(BaseModel):
+#     type: str = 'FeatureCollection'
+#     features: List[PhotonFeaturesData]
+#     # class Config:
+#     #     orm_mode = True
+        
