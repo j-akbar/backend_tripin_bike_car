@@ -1,5 +1,6 @@
 import socketio
 from core.socket_io import sio
+import redis
 
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -18,6 +19,12 @@ load_dotenv()
 SQLALCHEMY_DATABASE_URL = os.environ["DATABASE_URL"]
 conn = sqlite3.connect('sql_app.db')
 cursor = conn.cursor()
+# connet to redis
+REDIS_URI = os.getenv("REDIS_URI", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "123456")
+SET_CACHE = os.getenv("SET_CACHE")
+r = redis.StrictRedis(host=REDIS_URI, port=REDIS_PORT, db=0)
 
 class NoPrefixNamespace(socketio.AsyncNamespace):
 
@@ -216,3 +223,82 @@ class NoPrefixNamespace(socketio.AsyncNamespace):
     # # async def on_senddriver_coord(self, sid, data):
     # #     print("driver_coord ", data, sid)
     # #     await sio.emit("driver_coord", data, room=sid)
+    
+    
+    
+    # chat data dictionary to store user and driver chat messages
+    # async def on_reconnect_user_mitra(self, sid, id_assigned):
+    #     id_assigned = id_assigned
+    #     results = []
+    #     chats = cursor.execute(
+    #         f"""SELECT *
+    #             FROM chat_mitra cm
+    #             WHERE cm.id_assigned = {id_assigned} ORDER BY created_on ASC """
+    #     ).fetchall()
+    #     conn.commit()
+    #     for msg in chats:
+    #         results.append({
+    #             "id_assigned": msg[1],
+    #             "person_id": msg[2],
+    #             "image": msg[4],
+    #             "type": msg[5],
+    #             "message": msg[6],
+    #             "file_name": msg[7],
+    #             "file_size": msg[8],
+    #             "class_name": msg[9],
+    #             "time": msg[10],
+    #             "is_read": msg[11],
+    #             "created_on": msg[12]
+    #         })
+    #     await sio.emit("reconnect_user_mitra", results, sid)
+
+
+    # chat user mitra
+    async def on_chat_user_mitra(self, sid, data):
+        json_data = json.dumps(data)
+        json_load = json.loads(json_data)
+        id_assigned = json_load["id_assigned"]
+        person_id = json_load["person_id"]
+        image = json_load["image"]
+        type = json_load["type"]
+        message = json_load["message"]
+        file_name = json_load["file_name"]
+        file_size = json_load["file_size"]
+        class_name = json_load["class_name"]
+        time = json_load["time"]
+        update_values = (id_assigned, person_id, image, type, message, file_name, file_size, class_name, time, True, datetime.now())
+        cursor.execute(
+            f"""INSERT INTO chat_mitra(id_assigned, person_id, image, type, message, file_name, file_size, class_name, time, is_read, created_on) VALUES (?,?,?,?,?,?,?,?,?,?,?) """, update_values)
+        conn.commit()
+        results = []
+        chats = cursor.execute(
+            f"""SELECT *
+                FROM chat_mitra cm
+                WHERE cm.id_assigned = {id_assigned} ORDER BY created_on ASC """
+        ).fetchall()
+        conn.commit()
+        for msg in chats:
+            results.append({
+                "id_assigned": msg[1],
+                "person_id": msg[2],
+                "image": msg[3],
+                "type": msg[4],
+                "message": msg[5],
+                "file_name": msg[6],
+                "file_size": msg[7],
+                "class_name": msg[8],
+                "time": msg[9],
+                "is_read": msg[10],
+                "created_on": msg[11]
+            })
+        await sio.emit("chat_user_mitra", results, sid)
+        
+    # disconect user mitra
+    # async def on_disconnect_user_mitra(self, sid, data):
+    #     json_data = json.dumps(data)
+    #     json_load = json.loads(json_data)
+    #     user_id = json_load["id"]
+    #     if user_id in self.chat_data:
+    #         del self.chat_data[user_id]
+    #     print("disconnect_user_mitra ", user_id, sid)
+    #     await sio.emit("disconnect_user_mitra", {"status": "success", "id": user_id}, room=sid)

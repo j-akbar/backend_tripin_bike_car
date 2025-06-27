@@ -15,5 +15,8 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "123456")
 redis_url = f"redis://{REDIS_URI}:{REDIS_PORT}/0"
 mgr = socketio.AsyncRedisManager(url=redis_url) 
 sio = socketio.AsyncServer(
-    async_mode="asgi", cors_allowed_origins="*", client_manager=mgr
+    logger=True,
+    async_mode="asgi",
+    cors_allowed_origins="*",
+    client_manager=mgr
 )

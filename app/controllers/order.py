@@ -38,9 +38,13 @@ def create_order(request: schemas.Order, db: Session = Depends(get_db)):
                 models.Order.status == 0  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
             ).first()
             if check_order:
-                check_order.updated_on = datetime.now()
+                # hapus semua order yang ada
+                db.delete(check_order)
+                # create new order
+                new_order = models.Order(**request.model_dump(), created_on=datetime.now())
+                db.add(new_order)
                 db.commit()
-                return ({ "id": check_order.id, "status_code": status.HTTP_200_OK, "message": "Successfully updated order" })
+                return ({ "id": check_order.id, "status_code": status.HTTP_200_OK, "message": "Successfully delete and create orders" })
             else:
                 new_order = models.Order(**request.model_dump(), created_on=datetime.now())
                 db.add(new_order)
@@ -85,25 +89,20 @@ def get_orders_by_user(user_id: int, db: Session = Depends(get_db)):
     if orders:
         result = []
         for order in orders:
+            # The `city_name` variable in the code snippet is being used to convert the city name to a
+            # standardized format. It checks the input city name and maps it to a specific format
+            # based on predefined rules. If the input city matches one of the predefined mappings
+            # (e.g., "North Jakarta" to "Jakarta Utara"), it assigns the corresponding standardized
+            # city name to the `city_name` variable. If the input city does not match any predefined
+            # mapping, it replaces certain substrings in the city name to adjust the format.
             city_name = get_city(order.city)
-            # if order.city == "North Jakarta":
-            #     city_name = "Jakarta Utara"
-            # elif order.city == "South Jakarta":
-            #     city_name = "Jakarta Selatan"
-            # elif order.city == "East Jakarta":
-            #     city_name = "Jakarta Timur"
-            # elif order.city == "West Jakarta":
-            #     city_name = "Jakarta Barat"
-            # else:
-            #     city_name = order.city.replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat').replace('Java', 'Jawa')
-            # reversed_city_name = reverse_name_words(city_name)
 
             # province_name = order.province.replace('Java', 'Jawa').replace('North', 'Utara').replace('South', 'Selatan').replace('East', 'Timur').replace('West', 'Barat')
             # reversed_province_name = reverse_name_words(province_name)
             province_name = get_province(order.province)
 
             result.append({
-                "label": f"{order.label} ({order.district})",
+                "label": f"{order.label} ({order.district} {order.building})",
                 "description": f"{order.address}, {order.locality} ({order.district}) {city_name} <b>{province_name}</b> {order.postcode}"
             })
         return result

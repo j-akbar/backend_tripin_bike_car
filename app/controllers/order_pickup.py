@@ -31,9 +31,13 @@ def create_order_pickup(request: schemas.OrderPickup, db: Session = Depends(get_
                 models.OrderPickup.finished == 0,    # 0 = belum selesai, 1 = sudah selesai
             ).first()
             if check_order:
-                check_order.updated_on = datetime.now()
+                # hapus semua order pickup yang ada
+                db.delete(check_order)
+                # create new order pickup
+                new_order = models.OrderPickup(**request.model_dump(), created_on=datetime.now())
+                db.add(new_order)
                 db.commit()
-                return check_order  # "Successfully updated order pickup"
+                return check_order  # "Successfully delete and create order pickup"
             else:
                 new_order_pickup = models.OrderPickup(**request.model_dump(), created_on=datetime.now())
                 db.add(new_order_pickup)

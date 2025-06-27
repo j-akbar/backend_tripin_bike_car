@@ -52,7 +52,7 @@ class Order(BaseModel):
     country_code_iso3: str = ""  # IDN, USA, etc.
     region: str = ""
     state: str = ""
-    province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province: str = ""  # utk photon, province = city, ex: Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
     sublabel: str = ""
@@ -90,7 +90,7 @@ class OrderPickup(BaseModel):
     country_code_iso3: str = ""  # IDN, USA, etc.
     region: str = ""
     state: str = ""
-    province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province: str = ""  # utk photon, province = city, ex: Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
     sublabel: str = ""
@@ -136,7 +136,7 @@ class DriverCoords(BaseModel):
     country_name: str = ""
     region: str = ""
     state: str = ""
-    province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province: str = ""  # utk photon, province = city, ex: Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
     sublabel: str = ""
@@ -163,7 +163,7 @@ class DriverCoordsOut(BaseModel):
     vehicle_type: int = 0   # 0 = bike, 1 = car, 2 = truck, etc.
     country_code: str = ""
     region: str = ""
-    province: str = ""  # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province: str = ""  # utk photon, province = city, ex: Jawa Barat, DKI Jakarta, Tangerang, etc.
     city: str = ""
     label: str = ""
     sublabel: str = ""

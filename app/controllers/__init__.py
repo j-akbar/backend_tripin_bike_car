@@ -8,6 +8,7 @@ from app.controllers.order_assigned import router as order_assigned_router
 from app.controllers.testingGraphhopper import router as testing_graphhopper_router
 from app.controllers.testingOpenRouteService import router as testing_open_route_service_router
 from app.controllers.autocomplete import router as autocomplete_service_router
+from app.controllers.chat_mitra import router as chat_mitra_router
 
 def include_routers(app):
     app.include_router(
@@ -40,6 +41,10 @@ def include_routers(app):
 
     app.include_router(
         currency_price_router, prefix ="/api/v1/currency_price", tags = ['Currency Price']
+    )
+    
+    app.include_router(
+        chat_mitra_router, prefix ="/api/v1/chat_mitra", tags = ['Chat Mitra']
     )
 
     # app.include_router(

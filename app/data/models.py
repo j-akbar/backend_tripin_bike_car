@@ -30,7 +30,7 @@ class Order(Base):
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="")
     state = Column(String, default="")
-    province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province = Column(String, default="") # utk photon, province = city, ex Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="")
     label = Column(String, default="")
     sublabel = Column(String, default="")
@@ -72,7 +72,7 @@ class OrderPickup(Base): # order tercatat hanya detail order pickup
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="")
     state = Column(String, default="")
-    province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province = Column(String, default="") # utk photon, province = city, ex Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="")
     label = Column(String, default="")
     sublabel = Column(String, default="")
@@ -124,7 +124,7 @@ class DriverCoords(Base):
     country_code_iso3 = Column(String, default="") # IDN, USA, etc.
     region = Column(String, default="") # Jawa Barat, DKI Jakarta, etc.
     state = Column(String, default="")
-    province = Column(String, default="") # Jawa Barat, DKI Jakarta, Tangerang, etc.
+    province = Column(String, default="") # utk photon, province = city, ex Jawa Barat, DKI Jakarta, Tangerang, etc.
     city = Column(String, default="") # Bandung, Jakarta, etc.
     label = Column(String, default="")
     sublabel = Column(String, default="")
@@ -181,5 +181,24 @@ class CountryPrice(Base): # setting harga berdasarkan negara
     car_harga_pertama = Column(Float)
     car_harga_meter_pertama = Column(Integer)
     car_harga_permeter = Column(Float)
+    created_on = Column(DateTime(timezone=True))
+    updated_on = Column(DateTime(timezone=True), default=None)
+
+class ChatMitra(Base):
+    __tablename__ = "chat_mitra"
+    id = Column(Integer, primary_key=True, index=True)
+    id_assigned = Column(Integer)  # id_order_assigned
+    person_id = Column(Integer)
+    image = Column(String, default="")
+    type = Column(String, default="text")  # text, image, video, audio, file
+    message = Column(String, default="")  # isi pesan
+    file_name = Column(String, default="")  # nama file jika type = image, video, audio, file
+    file_size = Column(Integer, default=0)  # ukuran file dalam byte
+    class_name = Column(String, default="")  # className for styling, e.g. "user", "mitra"
+    time = Column(Integer, default=0)  # timestamp in seconds
+    is_active = Column(Boolean, default=True)  # 0 = tidak aktif, 1 = aktif
+    is_deleted = Column(Boolean, default=False)  # 0 = tidak dihapus, 1 = dihapus
+    is_sent = Column(Boolean, default=False)  # 0 = belum dikirim, 1 = sudah dikirim
+    is_read = Column(Boolean, default=False)  # 0 = belum dibaca, 1 = sudah dibaca
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
