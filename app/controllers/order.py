@@ -21,7 +21,7 @@ def get_orders(db: Session = Depends(get_db)):
         return ({ "status_code": status.HTTP_404_NOT_FOUND, "detail": "Not found order information" })
 
 @router.post("/", status_code =status.HTTP_201_CREATED, summary="Create order from user")
-def create_order(request: schemas.Order, db: Session = Depends(get_db)):
+def create_order(request: schemas.Order, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     try:
         # Check if an order already exists for the user with the same coordinates and status
         check_active_order = db.query(models.Order).filter(
@@ -44,7 +44,7 @@ def create_order(request: schemas.Order, db: Session = Depends(get_db)):
                 new_order = models.Order(**request.model_dump(), created_on=datetime.now())
                 db.add(new_order)
                 db.commit()
-                return ({ "id": check_order.id, "status_code": status.HTTP_200_OK, "message": "Successfully delete and create orders" })
+                return ({ "id": new_order.id, "status_code": status.HTTP_200_OK, "message": "Successfully delete and create orders" })
             else:
                 new_order = models.Order(**request.model_dump(), created_on=datetime.now())
                 db.add(new_order)
@@ -106,12 +106,12 @@ def get_orders_by_user(user_id: int, db: Session = Depends(get_db)):
                 "description": f"{order.address}, {order.locality} ({order.district}) {city_name} <b>{province_name}</b> {order.postcode}"
             })
         return result
-    else:
-        return ({ "status_code": status.HTTP_404_NOT_FOUND, "detail": f"Not found order information for user_id {user_id}" })
-    # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found order information for user_id {user_id}")
+    # else:
+        # return ({ "status_code": status.HTTP_404_NOT_FOUND, "detail": f"Not found order information for user_id {user_id}" })
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found order information for user_id {user_id}")
 
 @router.delete("/{order_id}/", status_code =status.HTTP_202_ACCEPTED)
-def delete_order(order_id: int, db: Session = Depends(get_db)):
+def delete_order(order_id: int, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if order:
         db.delete(order)
@@ -120,7 +120,7 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
     raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Not found order information for order_id {order_id}")
 
 @router.delete("/delete-order-user/{user_id}/", status_code =status.HTTP_202_ACCEPTED)
-def delete_order(user_id: int, db: Session = Depends(get_db)):
+def delete_order(user_id: int, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     order = db.query(models.Order).filter(models.Order.id_user == user_id).all()
     try:
         if order:

@@ -12,13 +12,13 @@ import requests
 router = APIRouter()
 
 @router.post("/", status_code=status.HTTP_200_OK, summary="Create order pickup from user")
-def create_order_pickup(request: schemas.OrderPickup, db: Session = Depends(get_db)):
+def create_order_pickup(request: schemas.OrderPickup, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     try:
         # check active order pickup
         active_order = db.query(models.OrderPickup).filter(
             models.OrderPickup.id_user == request.id_user,
             models.OrderPickup.status == 1,     # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-            models.OrderPickup.id_driver != 0,  # 0 = belum ada driver yang assigned, >0 = sudah ada driver yang assigned
+            models.OrderPickup.id_mitra != 0,  # 0 = belum ada mitra yang assigned, >0 = sudah ada mitra yang assigned
         ).first()
         if active_order:
             return active_order
@@ -26,7 +26,7 @@ def create_order_pickup(request: schemas.OrderPickup, db: Session = Depends(get_
             check_order = db.query(models.OrderPickup).filter(
                 models.OrderPickup.id_user == request.id_user,
                 models.OrderPickup.status == 0,     # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-                models.OrderPickup.is_pickup == 0,  # 0 = belum pickup, 1 = sudah di pickup oleh driver
+                models.OrderPickup.is_pickup == 0,  # 0 = belum pickup, 1 = sudah di pickup oleh mitra
                 models.OrderPickup.running == 0,    # 0 = belum jalan, 1 = sudah jalan
                 models.OrderPickup.finished == 0,    # 0 = belum selesai, 1 = sudah selesai
             ).first()
@@ -64,7 +64,7 @@ def get_order_pickup_by_user_id(id_user: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order pickup not found")
 
 @router.delete("/{id_user}/", status_code=status.HTTP_202_ACCEPTED)
-def delete_order_pickup(id_user: int, db: Session = Depends(get_db)):
+def delete_order_pickup(id_user: int, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     try:
         order_pickup = db.query(models.OrderPickup).filter(models.OrderPickup.id_user == id_user).all()
         if not order_pickup:

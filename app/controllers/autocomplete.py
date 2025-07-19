@@ -126,7 +126,7 @@ async def get_autocomplete(params: schemas.Autocomplete, redis: Redis = Depends(
         lon = params.lon
         # cached_item = redis.get(f"item:{q}")
         if(country_code and q and not lat and not lon):  # jika !latlon
-            cached_item = redis.get(f"ac:{country_code.lower()}-q:{q.lower()}")
+            cached_item = redis.get(f"{country_code.lower()}:{q.lower()}")
             if cached_item:
                 return json.loads(cached_item)
             else:
@@ -166,13 +166,13 @@ async def get_autocomplete(params: schemas.Autocomplete, redis: Redis = Depends(
                             "coordinates": features.get("geometry").get("coordinates", []),
                         }
                     })
-                redis.set(f"ac:{country_code.lower()}-q:{q.lower()}", json.dumps(results), ex=SET_CACHE)
+                redis.set(f"{country_code.lower()}:{q.lower()}", json.dumps(results), ex=SET_CACHE)
                 return results
             
         elif(country_code and q and lat and lon): # semua data lengkap
             new_lat = round(lat, 0)
             new_lon = round(lon, 0)
-            cached_item = redis.get(f"ac:{country_code.lower()}-q:{q.lower()}-lat:{new_lat}-lon:{new_lon}")
+            cached_item = redis.get(f"{country_code.lower()}:{q.lower()}:lat:{new_lat}:lon:{new_lon}")
             if cached_item:
                 return json.loads(cached_item)
             else:
@@ -212,7 +212,7 @@ async def get_autocomplete(params: schemas.Autocomplete, redis: Redis = Depends(
                             "coordinates": features.get("geometry").get("coordinates", []),
                         }
                     })
-                redis.set(f"ac:{country_code.lower()}-q:{q.lower()}-lat:{new_lat}-lon:{new_lon}", json.dumps(results), ex=SET_CACHE)
+                redis.set(f"{country_code.lower()}:{q.lower()}:lat:{new_lat}:lon:{new_lon}", json.dumps(results), ex=SET_CACHE)
                 return results
             
         elif(country_code and not q and lat and lon):    # jika hanya latlon

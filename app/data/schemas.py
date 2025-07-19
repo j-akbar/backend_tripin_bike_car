@@ -8,8 +8,7 @@ class User(BaseModel):
     name : str
     email: str
     password: str
-
-
+    
 class UserOut(BaseModel):
     # id : int
     name: str
@@ -20,6 +19,25 @@ class UserOut(BaseModel):
 
     class Config():
         orm_mode = True
+    
+class Phone(BaseModel):
+    id_from: int
+    name: str
+    phone: str
+    password: str
+    
+class LoginPhone(BaseModel):
+    phone: str
+    password: str
+    
+# class LoginPhoneOut(BaseModel):
+#     name: str
+#     phone: str
+#     added_on : Optional[datetime] = None
+#     update_on : Optional[datetime] = None
+
+#     class Config():
+#         orm_mode = True
 
 
 class Login(BaseModel):
@@ -115,15 +133,15 @@ class OrderPickup(BaseModel):
     status_nearest: int = 0  # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
     canceled_reason: str = ""  # Alasan pembatalan order
     promo: str = ""
-    is_pickup: int = 0  # 0 = belum pickup, 1 = driver sudah tiba, 2 = sudah di pickup oleh driver
-    id_driver: int = 0
-    waiting_time: float = 0.0  # waktu tunggu driver pickup customer
-    running: int = 0  # sudah diproses atau belum oleh driver
-    finished: int = 0  # sudah selesai atau belum oleh driver
+    is_pickup: int = 0  # 0 = belum pickup, 1 = mitra sudah tiba, 2 = sudah di pickup oleh mitra
+    id_mitra: int = 0
+    waiting_time: float = 0.0  # waktu tunggu mitra pickup customer
+    running: int = 0  # sudah diproses atau belum oleh mitra
+    finished: int = 0  # sudah selesai atau belum oleh mitra
     is_active: int = 1  # 0 = tidak aktif, 1 = aktif, 2 = pending, 3 = cancelled, 4 = completed
 
-class DriverCoords(BaseModel):
-    id_driver: int
+class MitraCoords(BaseModel):
+    id_mitra: int
     phone: str = ""
     name: str = ""
     place_id: str = ""  # Google Place ID
@@ -150,7 +168,7 @@ class DriverCoords(BaseModel):
     vehicle_number: str = ""
     priority: int = 10
     progress_order: bool = False    # 0 = belum ada order, 1 = sedang proses order
-    active: bool = True # toogle switch ditrigger dari app driver | 0 = tidak aktif, 1 = sedang aktif
+    active: bool = True # toogle switch ditrigger dari app mitra | 0 = tidak aktif, 1 = sedang aktif
     last_active: Optional[datetime] = None # Optional[datetime] = datetime.now()
     daily_order_count: int = 0  # Count all orders today
     daily_completed_count: int = 0  # Count of orders completed today
@@ -158,7 +176,7 @@ class DriverCoords(BaseModel):
     status: int = 1
     is_active: int = 1  # 0 = tidak aktif, 1 = aktif, 2 = pending, 3 = cancelled, 4 = completed, 5 = blocked, 6 = suspended, 7 = deactivated
 
-class DriverCoordsOut(BaseModel):
+class MitraCoordsOut(BaseModel):
     id_user: int
     vehicle_type: int = 0   # 0 = bike, 1 = car, 2 = truck, etc.
     country_code: str = ""
@@ -179,20 +197,61 @@ class ProcessAssign(BaseModel):
     vehicle_type: int
     country_code: str = "ID"
     region: str = "Banten"
-    url: str = ""  # URL for the latest location of the driver
+    url: str = ""  # URL for the latest location of the mitra
 
 class OrderAssigned(BaseModel):
     id_order_pickup: int
-    id_driver: int
+    id_mitra: int
     id_user: int
     vehicle_type: int = 0  # 0 = bike, 1 = car, 2 = truck, etc.
     latest_url: str = ""
-    waiting_time: float = 0.0  # waktu tunggu driver pickup customer
+    waiting_time: float = 0.0  # waktu tunggu mitra pickup customer
     status: int
     is_active: bool = False  # 0 = tidak aktif, 1 = aktif
+    
+class MitraJasaCoords(BaseModel):
+    id_mitra: int
+    id_layanan: int
+    id_jasa: int
+    phone: str = ""
+    name: str = ""
+    place_id: str = ""  # Google Place ID
+    place_type: str = ""  # e.g. N, W, S, etc.
+    place_key: str = ""  # e.g. amenity etc
+    place_value: str = ""  # e.g. Starbucks, restaurant, etc.
+    lat: float = 0.0
+    lon: float = 0.0
+    country_code: str = ""
+    country_name: str = ""
+    region: str = ""
+    state: str = ""
+    province: str = ""  # utk photon, province = city, ex: Jawa Barat, DKI Jakarta, Tangerang, etc.
+    city: str = ""
+    label: str = ""
+    sublabel: str = ""
+    postcode: str = ""
+    district: str = ""
+    locality: str = ""
+    place: str = ""
+    neighborhood: str = ""
+    address: str = ""
+    vehicle_type: int = 0
+    vehicle_number: str = ""
+    priority: int = 10
+    progress_order: bool = False    # 0 = belum ada order, 1 = sedang proses order
+    active: bool = True # toogle switch ditrigger dari app mitra | 0 = tidak aktif, 1 = sedang aktif
+    last_active: Optional[datetime] = None # Optional[datetime] = datetime.now()
+    daily_order_count: int = 0  # Count all orders today
+    daily_completed_count: int = 0  # Count of orders completed today
+    daily_cancelled_count: int = 0  # Count of orders cancelled today
+    harga_dewasa: float = 0.0  # harga jasa untuk dewasa
+    harga_anak: float = 0.0  # harga jasa untuk anak
+    status: int = 1
+    is_active: int = 1  # 0 = tidak aktif, 1 = aktif, 2 = pending, 3 = cancelled, 4 = completed, 5 = blocked, 6 = suspended, 7 = deactivated
+
 
 class CountryPrice(BaseModel):
-    country_code: str
+    country_code: str   # must in UPPERCASE, ex: ID, EN
     country_name: str
     country_code_iso3: str = ""
     region: str = ""
@@ -230,6 +289,16 @@ class Autocomplete(BaseModel):
     # state: Optional[str] = None
     # city: Optional[str] = None
 
+class EmptyAssignOrder(BaseModel):
+    id_user: int = 0
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    
+class HangingOrder(BaseModel):
+    id_mitra: int
+    country_code: str = "ID"
+    region: str = "Banten"
+    vehicle_type: int = 0  # 0 = bike, 1 = car, 2 = truck, etc.
 
 # response for photon based osm maps data
 # class InnerArray(BaseModel):

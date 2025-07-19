@@ -1,5 +1,6 @@
 from typing import List
 from datetime import datetime
+from django import db
 from sqlalchemy.orm import Session
 from app.data.database import get_db
 from app.data import schemas, models
@@ -53,13 +54,28 @@ def set_status_nearest(param_assign, sts, db: Session = Depends(get_db)):
         return order_pickup
 
 
-def response_for_pickup_nearest_driver(cursor, duration, redis: Redis = Depends(get_redis)):
+def response_for_pickup_nearest_mitra(cursor, duration, waktu_antar, jarak_antar, id_assigned, db: Session = Depends(get_db)):
+    kode_negara = cursor.country_code.upper()
+    country_price = db.query(models.CountryPrice).filter(models.CountryPrice.country_code == kode_negara).first()
+    biaya = 0
+    if(cursor.vehicle_type == 0 and jarak_antar > 0):
+        if(jarak_antar <= country_price.bike_harga_meter_pertama):
+            biaya = country_price.bike_harga_pertama
+        elif(jarak_antar > country_price.bike_harga_meter_pertama):
+            jarak_antar = jarak_antar - country_price.bike_harga_meter_pertama
+            biaya = country_price.bike_harga_pertama + ((jarak_antar / 1000) * country_price.bike_harga_permeter)
+    elif(cursor.vehicle_type == 1 and jarak_antar > 0):
+        if(jarak_antar <= country_price.car_harga_meter_pertama):
+            biaya = country_price.car_harga_pertama
+        elif(jarak_antar > country_price.car_harga_meter_pertama):
+            jarak_antar = jarak_antar - country_price.car_harga_meter_pertama
+            biaya = country_price.car_harga_pertama + ((jarak_antar / 1000) * country_price.car_harga_permeter)
     results = {
-        "id_driver": cursor.id_driver,
+        "id_mitra": cursor.id_mitra,
         "id_user": cursor.id_user,
         "description": {
             "id": cursor.id,
-            "id_driver": cursor.id_driver,
+            "id_mitra": cursor.id_mitra,
             "phone": cursor.phone,
             "name": cursor.name,
             # "place_id": cursor.place_id,
@@ -101,44 +117,80 @@ def response_for_pickup_nearest_driver(cursor, duration, redis: Redis = Depends(
             # "user_name": cursor. user_name,
             # "user_address": cursor.user_address,
             # "user_description": cursor.user_description,
-            # "user_lon": cursor.lon,
-            # "user_lat": cursor.user_lat,
-            "id_assigned": cursor.id_assigned or '',
+            "user_lon": cursor.user_lon if cursor.user_lon else 0.0,
+            "user_lat": cursor.user_lat if cursor.user_lat else 0.0,
+            "id_assigned": id_assigned if id_assigned else '',
             "waktu_jemput": duration,
-            "status_nearest": cursor.status_nearest
+            "jarak_antar": jarak_antar if jarak_antar else 0,
+            "waktu_antar": waktu_antar if waktu_antar else 0,
+            "status_nearest": cursor.status_nearest,
+            "biaya": biaya
         }
     }
     return results
-    # set order ke redis karena tidak ada driver yang aktif/ belum dipickup driver
-    # redis.set(f"op:{cursor.country_code.lower()}-id_driver:{cursor.id_driver}", json.dumps(results), ex=SET_CACHE)
+    # set order ke redis karena tidak ada mitra yang aktif/ belum dipickup mitra
+    # redis.set(f"op:{cursor.country_code.lower()}-id_mitra:{cursor.id_mitra}", json.dumps(results), ex=SET_CACHE)
     # return results
 
-# def response_for_pickup_nearest_driver_status_6(param_assign, sts, db: Session = Depends(get_db)):
+# def response_for_pickup_nearest_mitra_status_6(param_assign, sts, db: Session = Depends(get_db)):
 #     response_data = {
 #         "status": 
 #     }
 #     return response_data
 
 
+def empty_assignment_order(order_pickup, param_assign, db: Session = Depends(get_db)):
+    try:
+        order_assignment = db.query(models.OrderAssigned).filter(
+            models.OrderAssigned.id_user == param_assign.id_user,
+            models.OrderAssigned.status != 0,
+            models.OrderAssigned.is_active != 0
+        ).first()
+        if order_assignment:
+            order_assignment.is_active = 0
+            order_assignment.status = 0   
+        
+        # create new empty assignment order
+        empty_assignment = models.OrderAssigned(
+            id_order_pickup=order_pickup.id,
+            id_user=order_pickup.id_user,
+            id_mitra=0,  # 0 means no mitra assigned
+            vehicle_type=param_assign.vehicle_type,
+            waiting_time=0.0,  # waktu tunggu mitra pickup customer
+            jarak_antar=order_pickup.jarak,
+            waktu_antar=order_pickup.waktu,
+            url=param_assign.url,  # URL for the latest location of the mitra
+            status=5,  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled, 4 = pending, 5 = not assigned
+            is_active=1,  # 0 = tidak aktif, 1 = aktif
+            created_on=datetime.now()
+        )
+        db.add(empty_assignment)
+        db.commit()
+        return empty_assignment
+    except Exception as e:
+        print(f"Error creating empty assignment order: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create empty assignment order")
 
-@router.post("/process-pickup-nearest-driver/", status_code=status.HTTP_200_OK, summary="Process get all nearest driver for pickup triggered by user")
-def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
+
+@router.post("/process-pickup-nearest-mitra/", status_code=status.HTTP_200_OK, summary="Process get all nearest mitra for pickup triggered by user")
+def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depends(get_db), redis: Redis = Depends(get_redis), payload=Depends(jwt_auth_wrapper)):
     # Logic to create an assign order
     try:
         # check order apakah sudah di assign
         assigned_orders = db.execute(
-            f"""SELECT DC.*, OA.id id_assigned, OA.id_order_pickup id_order, OA.id_user, OA.waiting_time, OA.waktu_jemput, OA.waktu_antar, OP.status_nearest  
+            f"""SELECT DC.*, OA.id id_assigned, OA.id_order_pickup id_order, OA.id_user, OA.waiting_time, OA.waktu_jemput, OA.jarak_antar, OA.waktu_antar, OP.status_nearest,
+            OP.lon user_lon, OP.lat user_lat     
                 FROM order_assigned OA
-                JOIN driver_coords DC
-                ON OA.id_driver = DC.id_driver
+                JOIN mitra_coords DC
+                ON OA.id_mitra = DC.id_mitra
                 JOIN order_pickup OP
                 ON OA.id_order_pickup = OP.id
-                WHERE OA.status=1 AND OA.is_active=1 AND DC.progress_order = 1
+                WHERE OA.status=1 AND OA.is_active=1 AND DC.progress_order = 1 AND DC.id_layanan = 1 
                 AND OA.id_user={param_assign.id_user}"""
         ).first()
         if assigned_orders:
             db.commit()
-            response_data = response_for_pickup_nearest_driver(assigned_orders, assigned_orders.waktu_antar, redis)
+            response_data = response_for_pickup_nearest_mitra(assigned_orders, assigned_orders.waktu_jemput, assigned_orders.waktu_antar, assigned_orders.jarak_antar, assigned_orders.id_assigned, db)
             print(f"assigned_orders: {response_data}")
             return response_data
         else:
@@ -146,7 +198,7 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
             order_pickup = db.query(models.OrderPickup).filter(
             models.OrderPickup.id_user == param_assign.id_user,
             models.OrderPickup.status == 0,
-            models.OrderPickup.id_driver == 0,  # Assuming 0 means no driver assigned
+            models.OrderPickup.id_mitra == 0,  # Assuming 0 means no mitra assigned
             models.OrderPickup.is_pickup == 0,  # Assuming 0 means not picked up yet
             models.OrderPickup.running == 0,    # Assuming 0 means not in progress
             models.OrderPickup.finished == 0,    # Assuming 0 means not finished
@@ -155,189 +207,194 @@ def create_assign_order(param_assign: schemas.ProcessAssign, db: Session = Depen
             models.OrderPickup.country_code == param_assign.country_code,
             models.OrderPickup.region == param_assign.region
             ).first()
-        if not order_pickup:
-            db.commit()
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order pickup tidak ditemukan")
-        else:
-            # get nearest driver
-            cursor = db.execute(
-            f"""SELECT DC.*, 
-                OP.id_user, OP.id_order, 
-                OP.phone user_phone, OP.name user_name, OP.address user_address, OP.description user_description, OP.lon user_lon, OP.lat user_lat, OP.status_nearest 
-                FROM order_pickup OP 
-                JOIN driver_coords DC 
-                ON OP.vehicle_type_ordered = DC.vehicle_type AND OP.country_code = DC.country_code AND OP.region = DC.region 
-                WHERE OP.id_user = {order_pickup.id_user} AND OP.vehicle_type_ordered = {order_pickup.vehicle_type_ordered} AND 
-                DC.status = 1 AND DC.active = 1 AND DC.progress_order = 0 AND
-                DC.is_active = 1 AND 
-                OP.country_code = '{order_pickup.country_code}' AND (OP.state = '{order_pickup.state}' OR OP.city = '{order_pickup.city}')
-                ORDER BY DC.priority, DC.daily_order_count, DC.daily_cancelled_count ASC""").all()
-            if not cursor:
-                print(f"status param 5 ke 1 {param_assign}")
-                set_sts_nearest_order = set_status_nearest(param_assign, 6, db)
-                # response_data = response_for_pickup_nearest_driver_status_6(param_assign, 6, db)
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver tidak tersedia")
+            if not order_pickup:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order pickup tidak ditemukan")
             else:
-                jumlah_driver = [len(cursor),len(cursor)] # mendapatkan jumlah driver dihitung dari 0
-                lon_lat_driver = [] # e.g: [['106.734242608533', '-6.31829872108153'], ['106.738404508861', '-6.2907219825044']]
-                for row in cursor:
-                    lon_lat_driver.append([row.lon, row.lat])
-                lon_lat_driver.append([order_pickup.lon, order_pickup.lat]) # menambah destination pickup ke array log_lan_driver
-                # Assuming order_pickup has the necessary attributes like lon and lat
-                url = f"{API_HOST_OPENROUTE}/v2/matrix/driving-car"
-                headers = {
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Authorization": API_KEY_OPENROUTE_1
-                    }
-                body = {
-                    "locations": lon_lat_driver,  # List of driver coordinates
-                    "destinations": jumlah_driver,  # Only the last location is the destination (pickup location)
-                    # "sources": [0],  # Only the first location is the source (driver)
-                    "metrics": ["distance", "duration"],
-                    "resolve_locations":"false",
-                    "units":"m"
-                }
-                # print("Request Body:", json.dumps(body, indent=2))
-                response = requests.post(url, headers=headers, json=body)
-                # # response.raise_for_status()
-                data = response.json()
-                durations = data.get('durations', [])
-                results = []    # untuk menampung order dengan "status_nearest" 3 sampai 6
-                if response.status_code == 200:
-                    if not durations or len(durations) == 0:
-                        return {"status_code": status.HTTP_404_NOT_FOUND, "detail": "No durations found in the response"}
-                    for i in range(len(durations)):
-                        # print(f'duration {durations[i]}')
-                        # print(f"Index: {i}, Value: {durations[i]}")
-                        # print(f"Duration for driver {i}: {durations[i][0]} seconds")
-                        if durations[i][0] > 0.0 and durations[i][0] <= 300.0:  # 0-5 minutes
-                            # Create a new assignment for the driver
-                            new_assignment = models.OrderAssigned(
-                                id_order_pickup=order_pickup.id,
-                                id_user=order_pickup.id_user,
-                                id_driver=cursor[i].id_driver,
-                                vehicle_type=param_assign.vehicle_type,
-                                waktu_jemput=durations[i][0],
-                                waktu_antar=order_pickup.waktu,
-                                url=param_assign.url,  # URL for the latest location of the driver
-                                status=1,  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-                                is_active=1,  # 0 = tidak aktif, 1 = aktif
-                                created_on=datetime.now()
-                            )
-                            db.add(new_assignment)
-                            # update the order pickup with the assigned driver
-                            order_pickup.updated_on = datetime.now()
-                            order_pickup.status = 1  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-                            order_pickup.id_driver = cursor[i].id_driver
-
-                            # update the driver coordinates to set progress_order to 1
-                            driver_coords = db.query(models.DriverCoords).filter(
-                                models.DriverCoords.id_driver == cursor[i].id_driver,
-                                # models.DriverCoords.place_id == driver_coords.place_id
-                            ).first()
-                            driver_coords.progress_order = 1
-
-                            # update the driver daily order count
-                            driver_coords.daily_order_count += 1
-
-                            # update status orders
-                            orders = db.query(models.Order).filter(
-                                models.Order.id_user == order_pickup.id_user
-                            ).all()
-                            for order in orders:
-                                order.status = 1
-                                order.updated_on = datetime.now()
-                                
-                            db.commit()
-                            response_data = response_for_pickup_nearest_driver(cursor[i], durations[i][0], redis)
-                            results.append(response_data)
-                            return response_data
-                        elif durations[i][0] > 300.0 and durations[i][0] <= 600.0:  # 5-10 minutes
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (5-10 minutes)")
-                            # check if the driver is already assigned to this order
-                            # check_assigned = db.query(models.OrderAssigned).filter(
-                            #     models.OrderAssigned.id_user == order_pickup.id_user,
-                            #     models.OrderAssigned.id_driver == cursor[i].id_driver,
-                            #     models.OrderAssigned.status == 1,  # Assuming status 0 means 'new' or 'pending'
-                            #     models.OrderAssigned.is_active == 1,  # Assuming 1 means active
-                            # ).order_by(models.OrderAssigned.created_on.desc()
-                            # ).all()
-                            # for assignment in check_assigned:
-                            #     db.delete(assignment)
-                            # db.commit()
-                            # Create a new assignment for the driver
-                            new_assignment = models.OrderAssigned(
-                                id_order_pickup=order_pickup.id,
-                                id_user=order_pickup.id_user,
-                                id_driver=cursor[i].id_driver,
-                                waktu_jemput=durations[i][0],
-                                waktu_antar=order_pickup.waktu,
-                                status=1,  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
-                                is_active=1,  # 0 = tidak aktif, 1 = aktif
-                                created_on=datetime.now()
-                            )
-                            db.add(new_assignment)
-                            # update the order pickup with the assigned driver
-                            order_pickup.updated_on = datetime.now()
-                            order_pickup.status = 1  # Assuming 1 means 'in progress'
-                            order_pickup.id_driver = cursor[i].id_driver
-
-                            # update the driver coordinates to set progress_order to 1
-                            driver_coords = db.query(models.DriverCoords).filter(
-                                models.DriverCoords.id_driver == cursor[i].id_driver,
-                                # models.DriverCoords.place_id == driver_coords.place_id
-                            ).first()
-                            driver_coords.progress_order = 1
-
-                            # update the driver daily order count
-                            driver_coords.daily_order_count += 1
-
-                            # update status orders
-                            orders = db.query(models.Order).filter(
-                                models.Order.id_user == order_pickup.id_user
-                            ).all()
-                            for order in orders:
-                                order.status = 1
-                                order.updated_on = datetime.now()
-                            db.commit()
-                            response_data = response_for_pickup_nearest_driver(cursor[i], durations[i][0], redis)
-                            results.append(response_data)
-                            return response_data
-                        elif durations[i][0] > 600.0 and durations[i][0] <= 1800.0: # 10-30 minutes
-                            print(f"driver 10-30 minutes {param_assign}")
-                            set_sts_nearest_order = set_status_nearest(param_assign, 3, db)
-                            db.commit()
-                            response_data = response_for_pickup_nearest_driver(cursor[i], durations[i][0], redis)
-                            results.append(response_data)
-                            # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
-                        elif durations[i][0] > 1800.0 and durations[i][0] <= 7200.0: # 30-120 minutes
-                            print(f"driver 30-120 minutes {param_assign}")
-                            set_sts_nearest_order = set_status_nearest(param_assign, 4, db)
-                            db.commit()
-                            response_data = response_for_pickup_nearest_driver(cursor[i], durations[i][0], redis)
-                            results.append(response_data)
-                            # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
-                        elif durations[i][0] > 7200.0: # diluar jangkauan driver
-                            print(f"driver lebih dari 120 minutes {param_assign}")
-                            set_sts_nearest_order = set_status_nearest(param_assign, 4, db)
-                            db.commit()
-                            response_data = response_for_pickup_nearest_driver(cursor[i], durations[i][0], redis)
-                            results.append(response_data)
-                    # return {"status_code": status.HTTP_200_OK, "detail": "Successfully fetched data from OpenRouteService"}
-                    redis.set(f"op:{param_assign.country_code.lower()}-region:{param_assign.region.lower()}", json.dumps(results), ex=SET_CACHE)
+                # get nearest mitra
+                cursor = db.execute(
+                f"""SELECT DC.*, 
+                    OP.id_user, OP.id_order, 
+                    OP.phone user_phone, OP.name user_name, OP.address user_address, OP.description user_description, OP.lon user_lon, OP.lat user_lat, OP.status_nearest, OP.waktu, OP.jarak 
+                    FROM order_pickup OP 
+                    JOIN mitra_coords DC 
+                    ON OP.vehicle_type_ordered = DC.vehicle_type AND OP.country_code = DC.country_code 
+                    WHERE OP.id_user = {order_pickup.id_user} AND OP.vehicle_type_ordered = {order_pickup.vehicle_type_ordered} AND 
+                    DC.status = 1 AND DC.active = 1 AND DC.progress_order = 0 AND DC.id_layanan = 1 AND 
+                    DC.is_active = 1 
+                    ORDER BY DC.priority, DC.daily_order_count, DC.daily_cancelled_count ASC""").all()
+                if not cursor:
+                    print(f"status param 5 ke 1 {param_assign}")
+                    set_sts_nearest_order = set_status_nearest(param_assign, 6, db)
+                    empty_assignment = empty_assignment_order(order_pickup, param_assign, db)
+                    # response_data = response_for_pickup_nearest_mitra_status_6(param_assign, 6, db)
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mitra tidak tersedia")
                 else:
-                    print(f"status param 5 ke 2 {param_assign}")
-                    # set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
-                    # response_data = response_for_pickup_nearest_driver(cursor[i], 0.0, redis)
-                    # db.commit()
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver route tidak tersedia")
-                    # return {"status_code": response.status_code, "detail": "Error fetching data from OpenRouteService"}
+                    jumlah_mitra = [len(cursor),len(cursor)] # mendapatkan jumlah mitra dihitung dari 0
+                    lon_lat_mitra = [] # e.g: [['106.734242608533', '-6.31829872108153'], ['106.738404508861', '-6.2907219825044']]
+                    for row in cursor:
+                        lon_lat_mitra.append([row.lon, row.lat])
+                    lon_lat_mitra.append([order_pickup.lon, order_pickup.lat]) # menambah destination pickup ke array log_lan_mitra
+                    # Assuming order_pickup has the necessary attributes like lon and lat
+                    url = f"{API_HOST_OPENROUTE}/v2/matrix/driving-car"
+                    headers = {
+                        "Content-Type": "application/json; charset=utf-8",
+                        "Authorization": API_KEY_OPENROUTE_1
+                        }
+                    body = {
+                        "locations": lon_lat_mitra,  # List of mitra coordinates
+                        "destinations": jumlah_mitra,  # Only the last location is the destination (pickup location)
+                        # "sources": [0],  # Only the first location is the source (mitra)
+                        "metrics": ["distance", "duration"],
+                        "resolve_locations":"false",
+                        "units":"m"
+                    }
+                    # print("Request Body:", json.dumps(body, indent=2))
+                    response = requests.post(url, headers=headers, json=body)
+                    # # response.raise_for_status()
+                    data = response.json()
+                    durations = data.get('durations', [])
+                    if response.status_code == 200:
+                        results = []    # untuk menampung order dengan "status_nearest" 3 sampai 6
+                        if not durations or len(durations) == 0:
+                            return {"status_code": status.HTTP_404_NOT_FOUND, "detail": "No durations found in the response"}
+                        for i in range(len(durations)):
+                            if durations[i][0] > 0.0 and durations[i][0] <= 300.0:  # 0-5 minutes
+                                # Create a new assignment for the mitra
+                                new_assignment = models.OrderAssigned(
+                                    id_order_pickup=order_pickup.id,
+                                    id_user=order_pickup.id_user,
+                                    id_mitra=cursor[i].id_mitra,
+                                    vehicle_type=param_assign.vehicle_type,
+                                    waktu_jemput=durations[i][0],
+                                    jarak_antar=order_pickup.jarak,
+                                    waktu_antar=order_pickup.waktu,
+                                    url=param_assign.url,  # URL for the latest location of the mitra
+                                    status=1,  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+                                    is_active=1,  # 0 = tidak aktif, 1 = aktif
+                                    created_on=datetime.now()
+                                )
+                                db.add(new_assignment)
+                                # update the order pickup with the assigned mitra
+                                order_pickup.updated_on = datetime.now()
+                                order_pickup.status = 1  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+                                order_pickup.id_mitra = cursor[i].id_mitra
+
+                                # update the mitra coordinates to set progress_order to 1
+                                mitra_coords = db.query(models.MitraCoords).filter(
+                                    models.MitraCoords.id_mitra == cursor[i].id_mitra,
+                                    # models.MitraCoords.place_id == mitra_coords.place_id
+                                ).first()
+                                mitra_coords.progress_order = 1
+
+                                # update the mitra daily order count
+                                mitra_coords.daily_order_count += 1
+
+                                # update status orders
+                                orders = db.query(models.Order).filter(
+                                    models.Order.id_user == order_pickup.id_user
+                                ).all()
+                                for order in orders:
+                                    order.status = 1
+                                    order.updated_on = datetime.now()
+                                    
+                                db.commit()
+                                response_data = response_for_pickup_nearest_mitra(cursor[i], durations[i][0], new_assignment.waktu_antar, new_assignment.jarak_antar, new_assignment.id, db)
+                                results.append(response_data)
+                                return response_data
+                            elif durations[i][0] > 300.0 and durations[i][0] <= 600.0:  # 5-10 minutes
+                                # Create a new assignment for the mitra
+                                new_assignment = models.OrderAssigned(
+                                    id_order_pickup=order_pickup.id,
+                                    id_user=order_pickup.id_user,
+                                    id_mitra=cursor[i].id_mitra,
+                                    vehicle_type=param_assign.vehicle_type,
+                                    waktu_jemput=durations[i][0],
+                                    jarak_antar=order_pickup.jarak,
+                                    waktu_antar=order_pickup.waktu,
+                                    url=param_assign.url,  # URL for the latest location of the mitra
+                                    status=1,  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+                                    is_active=1,  # 0 = tidak aktif, 1 = aktif
+                                    created_on=datetime.now()
+                                )
+                                db.add(new_assignment)
+                                # update the order pickup with the assigned mitra
+                                order_pickup.updated_on = datetime.now()
+                                order_pickup.status = 1  # Assuming 1 means 'in progress'
+                                order_pickup.id_mitra = cursor[i].id_mitra
+
+                                # update the mitra coordinates to set progress_order to 1
+                                mitra_coords = db.query(models.MitraCoords).filter(
+                                    models.MitraCoords.id_mitra == cursor[i].id_mitra,
+                                    # models.MitraCoords.place_id == mitra_coords.place_id
+                                ).first()
+                                mitra_coords.progress_order = 1
+
+                                # update the mitra daily order count
+                                mitra_coords.daily_order_count += 1
+
+                                # update status orders
+                                orders = db.query(models.Order).filter(
+                                    models.Order.id_user == order_pickup.id_user
+                                ).all()
+                                for order in orders:
+                                    order.status = 1
+                                    order.updated_on = datetime.now()
+                                db.commit()
+                                response_data = response_for_pickup_nearest_mitra(cursor[i], durations[i][0], new_assignment.waktu_antar, new_assignment.jarak_antar, new_assignment.id, db)
+                                results.append(response_data)
+                                return response_data
+                            elif durations[i][0] > 600.0 and durations[i][0] <= 1800.0: # 10-30 minutes
+                                # kirim ke order publik
+                                set_sts_nearest_order = set_status_nearest(param_assign, 3, db)
+                                db.commit()
+                                response_data = response_for_pickup_nearest_mitra(cursor[i], durations[i][0], cursor[i].waktu, cursor[i].jarak, 0, db)
+                                results.append(response_data)
+                                # send to redis for another mitra to pickup manually
+                                # redis.hset(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", f"id_mitra:{cursor[i].id_mitra}:id_user:{param_assign.id_user}", json.dumps(response_data))
+                                # redis.expire(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", SET_CACHE)
+                                # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
+                            elif durations[i][0] > 1800.0 and durations[i][0] <= 7200.0: # 30-120 minutes
+                                # kirim ke order publik
+                                print(f"mitra 30-120 minutes {param_assign}")
+                                set_sts_nearest_order = set_status_nearest(param_assign, 4, db)
+                                db.commit()
+                                response_data = response_for_pickup_nearest_mitra(cursor[i], durations[i][0], cursor[i].waktu, cursor[i].jarak, 0, db)
+                                results.append(response_data)
+                                # send to redis for another mitra to pickup manually
+                                # redis.hset(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", f"id_mitra:{cursor[i].id_mitra}:id_user:{param_assign.id_user}", json.dumps(response_data))
+                                # redis.expire(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", SET_CACHE)
+                                # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{set_sts_nearest_order}")
+                            else: # elif durations[i][0] > 7200.0: # diluar jangkauan mitra
+                                # kirim ke order publik
+                                print(f"mitra lebih dari 120 minutes {param_assign}")
+                                set_sts_nearest_order = set_status_nearest(param_assign, 4, db)
+                                db.commit()
+                                response_data = response_for_pickup_nearest_mitra(cursor[i], durations[i][0], cursor[i].waktu, cursor[i].jarak, 0, db)
+                                results.append(response_data)
+                                # send to redis for another mitra to pickup manually
+                                # redis.hset(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", f"id_mitra:{cursor[i].id_mitra}:id_user:{param_assign.id_user}", json.dumps(response_data))
+                                # redis.expire(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", SET_CACHE)
+                            # send to redis for another mitra to pickup manually
+                            redis.hset(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", f"id_user:{param_assign.id_user}", json.dumps(results))
+                            redis.expire(f"{param_assign.country_code.lower()}:{param_assign.region.lower()}", SET_CACHE)
+                        # return {"status_code": status.HTTP_200_OK, "detail": "Successfully fetched data from OpenRouteService"}
+                    else:
+                        print(f"status param 5 ke 2 {param_assign}")
+                        set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
+                        empty_assignment = empty_assignment_order(order_pickup, param_assign, db)
+                        # response_data = response_for_pickup_nearest_mitra(cursor[i], 0.0, redis)
+                        # db.commit()
+                        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mitra route tidak tersedia")
+                        # return {"status_code": response.status_code, "detail": "Error fetching data from OpenRouteService"}
+            # create empty assignment order
+            empty_assignment = empty_assignment_order(order_pickup, param_assign, db)
     except Exception as e:
-        print(f"status param 5 ke 3 {param_assign}")
-        # set_sts_nearest_order = set_status_nearest(param_assign, 5, db)
+        print(f"status param 5 ke 3 {e}")
+        # set_sts_nearest_order = set_status_nearest(param_assign, 6, db)
+        # empty_assignment = empty_assignment_order(order_pickup, param_assign, db)
         # db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Driver tidak tersedia...")
-        # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e} Proses assign sudah selesai, silahkan tunggu driver datang menjemput anda")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Mitra tidak tersedia...")
+        # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e} Proses assign sudah selesai, silahkan tunggu mitra datang menjemput anda")
 
 @router.get("/", status_code=status.HTTP_200_OK, summary="Get all assigned orders")
 def get_assign_order(db: Session = Depends(get_db)):
@@ -347,16 +404,16 @@ def get_assign_order(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/get-assign-order-driver/{id_driver}/", status_code=status.HTTP_200_OK, summary="Get all assigned orders for a specific driver, trigered by driver")
-def get_assign_order_driver(id_driver: int, db: Session = Depends(get_db)):
+@router.get("/get-assign-order-mitra/{id_mitra}/", status_code=status.HTTP_200_OK, summary="Get all assigned orders for a specific mitra, trigered by mitra")
+def get_assign_order_mitra(id_mitra: int, db: Session = Depends(get_db)):
     try:
         assigned_orders = db.execute(
-            f"""SELECT OP.*, OA.waktu_jemput, OA.waktu_antar
+            f"""SELECT OP.*, OA.waktu_jemput, OA.waktu_antar, OP.lon user_lon, OP.lat user_lat  
                 FROM order_assigned OA
                 JOIN order_pickup OP
                 ON OA.id_order_pickup = OP.id
                 WHERE OA.status=1 AND OA.is_active=1
-                AND OA.id_driver={id_driver}"""
+                AND OA.id_mitra={id_mitra}"""
         ).first()
         if not assigned_orders:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No assigned orders found for this order pickup")
@@ -365,31 +422,58 @@ def get_assign_order_driver(id_driver: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
-@router.get("/get-assigned-driver/{id_user}/", status_code=status.HTTP_200_OK, summary="get the driver assigned to the order, trigered by user")
-def get_assigned_driver(id_user: int, db: Session = Depends(get_db)):
+@router.get("/get-assigned-mitra/{id_user}/", status_code=status.HTTP_200_OK, summary="get the mitra assigned to the order, trigered by user")
+def get_assigned_mitra(id_user: int, db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
     try:
         assigned_orders = db.execute(
-            f"""SELECT DC.*, OA.waiting_time, OA.waktu_jemput, OA.waktu_antar
+            f"""SELECT DC.*, OA.id id_assigned, OA.id_order_pickup id_order, OA.id_user, OA.waiting_time, OA.waktu_jemput, OA.jarak_antar, OA.waktu_antar, OP.status_nearest, 
+            OP.lon user_lon, OP.lat user_lat     
                 FROM order_assigned OA
-                JOIN driver_coords DC
-                ON OA.id_driver = DC.id_driver
-                WHERE OA.status=1 AND OA.is_active=1
+                JOIN mitra_coords DC
+                ON OA.id_mitra = DC.id_mitra
+                JOIN order_pickup OP
+                ON OA.id_order_pickup = OP.id
+                WHERE OA.status=1 AND OA.is_active=1 AND DC.progress_order = 1 AND DC.id_layanan = 1 
                 AND OA.id_user={id_user}"""
         ).first()
         if not assigned_orders:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No assigned orders found for this driver")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No assigned orders found for this mitra")
         else:
             # user_trip = db.execute(
             #     f"""SELECT DC.*, OA.waiting_time, OA.waktu_jemput, OA.waktu_antar
             #         FROM order_assigned OA
-            #         JOIN driver_coords DC
-            #         ON OA.id_driver = DC.id_driver
+            #         JOIN mitra_coords DC
+            #         ON OA.id_mitra = DC.id_mitra
             #         WHERE OA.status=1 AND OA.is_active=1
             #         AND OA.id_user={id_user}"""
             # ).all()
-            return assigned_orders
+            results = response_for_pickup_nearest_mitra(assigned_orders, assigned_orders.waktu_jemput, assigned_orders.waktu_antar, assigned_orders.jarak_antar, assigned_orders.id_assigned, db)
+            return results
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    
+@router.post("/empty_assign_order/", status_code=status.HTTP_200_OK, summary="get the mitra assigned to the order, trigered by user")
+def empty_assign_order(request: schemas.EmptyAssignOrder, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
+    try:
+        if(request.lat and request.lon):
+            empty_order = db.execute(
+            f"""SELECT OP.*  
+                FROM order_pickup OP 
+                WHERE OP.id_user = {request.id_user}
+                AND ROUND(OP.lat, 5) = ROUND({request.lat}, 5)
+                AND ROUND(OP.lon, 5) = ROUND({request.lon} ,5)"""
+            ).first()
+            return empty_order
+        else:
+            empty_order = db.execute(
+            f"""SELECT OP.*  
+                FROM order_pickup OP 
+                WHERE OP.id_user = {request.id_user}"""
+            ).first()
+            return empty_order
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    
 
 @router.delete("/{id_user}/", status_code=status.HTTP_202_ACCEPTED, summary="Delete all order by id_user")
 def delete_assign_order(id_user: int, db: Session = Depends(get_db)):
@@ -400,21 +484,30 @@ def delete_assign_order(id_user: int, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order pickup not found")
         else:
             # delete order_assigned
-            assigned_orders = db.query(models.OrderAssigned).filter(models.OrderAssigned.id_user == id_user).first()
-            db.delete(assigned_orders)
+            assigned_orders = db.query(models.OrderAssigned).filter(models.OrderAssigned.id_user == id_user).all()
+            if assigned_orders:
+                for assigneds in assigned_orders:
+                    # db.delete(assigneds)
+                    # nonaktifkan assigned orders
+                    assigneds.status = 0
+                    assigneds.is_active = 0
+                    assigneds.updated_on = datetime.now()
+                db.commit()
+            else:
+                print(f"assigned order is empty")
 
             # delete all orders
             orders = db.query(models.Order).filter(models.Order.id_user == id_user).all()
             for order in orders:
                 db.delete(order)
 
-            # set status driver_coords
-            driver_sts = db.query(models.DriverCoords).filter(
-                models.DriverCoords.id_driver == order_pickup.id_driver,
-                models.DriverCoords.vehicle_type == order_pickup.vehicle_type_ordered
+            # set status mitra_coords
+            mitra_sts = db.query(models.MitraCoords).filter(
+                models.MitraCoords.id_mitra == order_pickup.id_mitra,
+                models.MitraCoords.vehicle_type == order_pickup.vehicle_type_ordered
                 ).first()
-            if driver_sts:
-                driver_sts.progress_order = 0
+            if mitra_sts:
+                mitra_sts.progress_order = 0
             
             # delete order_pickup
             db.delete(order_pickup)

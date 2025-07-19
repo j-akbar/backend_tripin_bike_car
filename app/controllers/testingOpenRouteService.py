@@ -89,7 +89,7 @@ def create_pickup_order(id_user: int, vehicle_type: str, country_code: str, regi
         order_pickup = db.query(models.OrderPickup).filter(
             models.OrderPickup.id_user == id_user,
             models.OrderPickup.status == 0,
-            models.OrderPickup.id_driver == 0,  # Assuming 0 means no driver assigned
+            models.OrderPickup.id_mitra == 0,  # Assuming 0 means no mitra assigned
             models.OrderPickup.is_pickup == 0,  # Assuming 0 means not picked up yet
             models.OrderPickup.running == 0,    # Assuming 0 means not in progress
             models.OrderPickup.finished == 0,    # Assuming 0 means not finished
@@ -104,7 +104,7 @@ def create_pickup_order(id_user: int, vehicle_type: str, country_code: str, regi
                 OP.id_user, OP.id_order, 
                 OP.phone user_phone, OP.name user_name, OP.address user_address, OP.description user_description, OP.lon user_lon, OP.lat user_lat 
                 FROM order_pickup OP 
-                JOIN driver_coords DC 
+                JOIN mitra_coords DC 
                 ON OP.vehicle_type_ordered = DC.vehicle_type AND OP.country_code = DC.country_code AND OP.region = DC.region 
                 WHERE OP.id_user = {order_pickup.id_user} AND OP.vehicle_type_ordered = {order_pickup.vehicle_type_ordered} AND 
                 DC.status = 1 AND DC.active = 1 AND DC.progress_order = 0 AND
@@ -117,15 +117,15 @@ def create_pickup_order(id_user: int, vehicle_type: str, country_code: str, regi
                 OP.label = '{order_pickup.label}' OR OP.sublabel = '{order_pickup.sublabel}') 
                 ORDER BY DC.priority, DC.daily_order_count, DC.daily_cancelled_count ASC""").all()
             if not cursor:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver coordinates not found")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mitra coordinates not found")
             else:
-                jumlah_driver = [len(cursor),len(cursor)] # mendapatkan jumlah driver dihitung dari 0
-                lon_lat_driver = [] # e.g: [['106.734242608533', '-6.31829872108153'], ['106.738404508861', '-6.2907219825044']]
+                jumlah_mitra = [len(cursor),len(cursor)] # mendapatkan jumlah mitra dihitung dari 0
+                lon_lat_mitra = [] # e.g: [['106.734242608533', '-6.31829872108153'], ['106.738404508861', '-6.2907219825044']]
                 for row in cursor:
-                    lon_lat_driver.append([row.lon, row.lat])
-                lon_lat_driver.append([order_pickup.lon, order_pickup.lat]) # menambah destination pickup ke array log_lan_driver
-                # print(lon_lat_driver)
-                # print(jumlah_driver)
+                    lon_lat_mitra.append([row.lon, row.lat])
+                lon_lat_mitra.append([order_pickup.lon, order_pickup.lat]) # menambah destination pickup ke array log_lan_mitra
+                # print(lon_lat_mitra)
+                # print(jumlah_mitra)
                 # Assuming order_pickup has the necessary attributes like lon and lat
                 url = f"{API_HOST_OPENROUTE}/v2/matrix/driving-car"
                 headers = {
@@ -133,9 +133,9 @@ def create_pickup_order(id_user: int, vehicle_type: str, country_code: str, regi
                     "Authorization": API_KEY_OPENROUTE_1
                     }
                 body = {
-                    "locations": lon_lat_driver,  # List of driver coordinates
-                    "destinations": jumlah_driver,  # Only the last location is the destination (pickup location)
-                    # "sources": [0],  # Only the first location is the source (driver)
+                    "locations": lon_lat_mitra,  # List of mitra coordinates
+                    "destinations": jumlah_mitra,  # Only the last location is the destination (pickup location)
+                    # "sources": [0],  # Only the first location is the source (mitra)
                     "metrics": ["distance", "duration"],
                     "resolve_locations":"false",
                     "units":"m"
@@ -150,17 +150,17 @@ def create_pickup_order(id_user: int, vehicle_type: str, country_code: str, regi
                         return {"status_code": status.HTTP_404_NOT_FOUND, "detail": "No durations found in the response"}
                     for i in range(len(durations)):
                         # print(f"Index: {i}, Value: {durations[i]}")
-                        # print(f"Duration for driver {i}: {durations[i][0]} seconds")
+                        # print(f"Duration for mitra {i}: {durations[i][0]} seconds")
                         if durations[i][0] > 0.0 and durations[i][0] <= 300.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (0-5 minutes)")
+                            # print(f"Mitra {i} has a duration of {durations[i][0]} seconds (0-5 minutes)")
                             return cursor[i]
                             # break
                         elif durations[i][0] > 300.0 and durations[i][0] <= 600.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (5-10 minutes)")
+                            # print(f"Mitra {i} has a duration of {durations[i][0]} seconds (5-10 minutes)")
                             return cursor[i]
                             # break
                         elif durations[i][0] > 600.0:
-                            # print(f"Driver {i} has a duration of {durations[i][0]} seconds (more than 10 minutes)")
+                            # print(f"Mitra {i} has a duration of {durations[i][0]} seconds (more than 10 minutes)")
                             return cursor
                             # continue
                         # cursor.close()

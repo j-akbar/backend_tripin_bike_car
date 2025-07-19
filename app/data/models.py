@@ -6,6 +6,17 @@ from datetime import datetime
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
+    id_user = Column(Integer, unique=True, index=True)
+    name = Column(String)
+    email = Column(String, unique=True, index=True)
+    password = Column(String)
+    added_on = Column(DateTime(timezone=True))
+    update_on = Column(DateTime(timezone=True), default=None)
+    
+class Mitra(Base):
+    __tablename__ = "mitra"
+    id = Column(Integer, primary_key=True, index=True)
+    id_mitra = Column(Integer, unique=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
     password = Column(String)
@@ -97,8 +108,8 @@ class OrderPickup(Base): # order tercatat hanya detail order pickup
     status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned
     canceled_reason = Column(String, default="") # Alasan pembatalan order
     promo = Column(String, default="") # e.g. promo code, discount code, etc.
-    is_pickup = Column(Integer, default=0)  # 0 = belum pickup, 1 = driver sudah tiba, 2 = sudah di pickup oleh driver
-    id_driver = Column(Integer, default=0)
+    is_pickup = Column(Integer, default=0)  # 0 = belum pickup, 1 = mitra sudah tiba, 2 = sudah di pickup oleh mitra
+    id_mitra = Column(Integer, default=0)
     waiting_time = Column(Float, default=0.0)   # waktu tunggu
     running = Column(Integer, default=0)    # 0 = belum jalan, 1 = sudah jalan, 2 = sudah sampai tujuan
     # 3 = sudah selesai, 4 = dibatalkan
@@ -107,10 +118,11 @@ class OrderPickup(Base): # order tercatat hanya detail order pickup
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
 
-class DriverCoords(Base):
-    __tablename__ = "driver_coords"
+class MitraCoords(Base):
+    __tablename__ = "mitra_coords"
     id = Column(Integer, primary_key=True, index=True)
-    id_driver = Column(Integer)
+    id_mitra = Column(Integer)
+    id_layanan = Column(Integer, default=1) # 1 = Bike-Car, 2 = Travel-Bus, 3 = Boat-Ferry, 4 = Jasa, 5 = Tour-Wisata
     phone = Column(String)
     name = Column(String, default="")
     place_id = Column(String, default="") # Google Place ID
@@ -138,7 +150,7 @@ class DriverCoords(Base):
     vehicle_number = Column(String, default="")
     priority = Column(Integer, default=10) # 10=prajurit, 9=kopral, 5=sersan, 4=letnan, 3=kapten 2=kolonel, 1=mayor, 0=jenderal, etc.
     progress_order = Column(Boolean, default=False)  # 0 = belum ada order, 1 = sedang proses order
-    active = Column(Boolean, default=True)  # toogle switch ditrigger dari app driver | 0 = tidak aktif, 1 = sedang aktif
+    active = Column(Boolean, default=True)  # toogle switch ditrigger dari app mitra | 0 = tidak aktif, 1 = sedang aktif
     last_active = Column(DateTime(timezone=True), default=datetime.now)
     daily_order_count = Column(Integer, default=0) # Count all orders today
     daily_completed_count = Column(Integer, default=0) # Count of orders completed today
@@ -152,11 +164,12 @@ class OrderAssigned(Base):
     __tablename__ = "order_assigned"
     id = Column(Integer, primary_key=True, index=True)
     id_order_pickup = Column(Integer)
-    id_driver = Column(Integer)
+    id_mitra = Column(Integer)
     id_user = Column(Integer)
     vehicle_type = Column(Integer, default=0)  # 0 = bike, 1 = car, 2 = truck, etc.
-    waiting_time = Column(Float, default=0.0)  # waktu tunggu driver pickup customer
-    waktu_jemput = Column(Float, default=0.0)   # waktu jemput driver ke user
+    waiting_time = Column(Float, default=0.0)  # waktu tunggu mitra pickup customer
+    waktu_jemput = Column(Float, default=0.0)   # waktu jemput mitra ke user
+    jarak_antar = Column(Float, default=0.0)    # jarak antar dari lokasi pickup ke lokasi dropoff
     waktu_antar = Column(Float, default=0.0)  # waktu antar customer ke lokasi destinasi
     url = Column(String, default="") 
     status = Column(Integer, default=0)  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
@@ -183,6 +196,71 @@ class CountryPrice(Base): # setting harga berdasarkan negara
     car_harga_permeter = Column(Float)
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
+    
+class OrderJasa(Base):
+    __tablename__ = "jasa_order"
+    id = Column(Integer, primary_key=True, index=True)
+    coord_ke = Column(Integer, default=1) # jumlah lokasi yang dipilih dalam sekali order
+    id_user = Column(Integer)
+    id_mitra = Column(Integer)
+    id_layanan = Column(Integer, default=4) # 1 = Bike-Car, 2 = Travel-Bus, 3 = Boat-Ferry, 4 = Jasa, 5 = Tour-Wisata
+    id_jasa = Column(Integer, default=0) # 1 = Cukur Rambut, 2 = Massage, 3. Manicure & Pedicure, 4 = Urut Tubuh, 5 = Laundry, 6 = Baby Sitter, 7 = Asisten Rumah Tangga, 8 = Helper
+    phone = Column(String)
+    name = Column(String, default="")
+    place_id = Column(String, default="") # Google Place ID
+    place_type = Column(String, default="") # e.g. N, W, S, etc.
+    place_key = Column(String, default="") # e.g. amenity etc
+    place_value = Column(String, default="") # e.g. Starbucks, restaurant, etc.
+    lat = Column(Float, default=0.0)
+    lon = Column(Float, default=0.0)
+    country_code = Column(String, default="")
+    country_name = Column(String, default="")
+    country_code_iso3 = Column(String, default="") # IDN, USA, etc.
+    region = Column(String, default="")
+    state = Column(String, default="")
+    province = Column(String, default="") # utk photon, province = city, ex Jawa Barat, DKI Jakarta, Tangerang, etc.
+    city = Column(String, default="")
+    label = Column(String, default="")
+    sublabel = Column(String, default="")
+    postcode = Column(String, default="")
+    district = Column(String, default="")   # Kecamatan, Kelurahan, etc.
+    locality = Column(String, default="") # Kota, Kabupaten, etc.
+    place = Column(String, default="")
+    neighborhood = Column(String, default="")
+    address = Column(String, default="") # Alamat lengkap e.g. Jl. Merdeka No. 1, RT 01/RW 02, Kelurahan Merdeka
+    building = Column(String, default="")
+    house_number = Column(String, default="")
+    road = Column(String, default="")
+    geojson = Column(String, default="")
+    jarak = Column(Float)
+    pendakian = Column(Float)
+    waktu = Column(Float)
+    id_jasa = Column(Integer, default=0)
+    status = Column(Integer, default=0) # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+    status_nearest = Column(Integer, default=0) # = 0, order no process, 1 = order near 0-5 minutes , 2 = order near 5-10 minutes, 3 = order near 10-30 minutes, 4 = order near than 30-120 minutes, 5 = order not assigned, 6 = state dan city tidak ditemukan, kesalahan query di cursor
+    created_on = Column(DateTime(timezone=True))
+    updated_on = Column(DateTime(timezone=True), default=None)
+    
+class OrderJasaAssigned(Base):
+    __tablename__ = "jasa_order_assigned"
+    id = Column(Integer, primary_key=True, index=True)
+    id_mitra = Column(Integer)
+    id_user = Column(Integer)
+    id_jasa = Column(Integer, default=0)  # 0 = bike, 1 = car, 2 = truck, etc.
+    reservation = Column(Integer, default=0) # 0 = no, 1 = yes
+    reservation_date = Column(DateTime(timezone=True), default=None) # date and time for reservation
+    reservation_time = Column(String, default="") # time in minutes for reservation
+    jumlah_dewasa = Column(Integer, default=1) # jumlah dewasa
+    jumlah_anak = Column(Integer, default=0) # jumlah anak
+    payment_method = Column(String, default="cash") # cash, credit_card, etc.
+    bonus = Column(Float, default=0.0) # bonus for mitra
+    jarak_kelokasi = Column(Float, default=0.0)    # jarak antara mitra ke lokasi user
+    waktu_kelokasi = Column(Float, default=0.0)  # waktu antara mitra ke lokasi user
+    url = Column(String, default="") 
+    status = Column(Integer, default=0)  # 0 = new, 1 = in progress, 2 = completed, 3 = cancelled
+    is_active = Column(Boolean, default=False)  # 0 = tidak aktif, 1 = aktif
+    created_on = Column(DateTime(timezone=True))
+    updated_on = Column(DateTime(timezone=True), default=None)
 
 class ChatMitra(Base):
     __tablename__ = "chat_mitra"
@@ -202,3 +280,4 @@ class ChatMitra(Base):
     is_read = Column(Boolean, default=False)  # 0 = belum dibaca, 1 = sudah dibaca
     created_on = Column(DateTime(timezone=True))
     updated_on = Column(DateTime(timezone=True), default=None)
+    

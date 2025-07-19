@@ -18,7 +18,7 @@ app = FastAPI(title="Backend TripIn for Bike and Car")
 origins = [
     "http://localhost:5005",    # url server ini
     "http://localhost:3010",    # osmmap (tidak digunakan lagi)
-    "http://localhost:3003",    # moblie_agent_travel_driver
+    "http://localhost:3003",    # moblie_agent_travel_mitra
     "http://localhost:3002",    # mobile_agent_travel_user
     "ws://localhost:5005",   # websocket server ini
 ]

@@ -12,6 +12,6 @@ import requests
 router = APIRouter()
 
 @router.get("/{id_assigned}/", status_code=status.HTTP_200_OK, summary="Get the list of all chat mitra")
-async def get_chat_mitra(id_assigned: int, db: Session = Depends(get_db)):
+async def get_chat_mitra(id_assigned: int, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     chat_mitra = db.query(models.ChatMitra).filter(models.ChatMitra.id_assigned == id_assigned).all()
     return chat_mitra

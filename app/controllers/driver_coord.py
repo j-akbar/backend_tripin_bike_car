@@ -1,3 +1,4 @@
+import os
 from typing import List
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -6,12 +7,24 @@ from app.data import schemas, models
 from app.controllers.auth import PasswordHashing
 from app.controllers.auth import jwt_auth_wrapper
 from fastapi import APIRouter, HTTPException, status, Depends
+from redis import Redis
 import requests
+
+# REDIS
+REDIS_URI = os.getenv("REDIS_URI", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "123456")
+SET_CACHE = os.getenv("SET_CACHE")
 
 router = APIRouter()
 
+# REDIS ACTION
+def get_redis():
+    return Redis(host=REDIS_URI, port=REDIS_PORT, db=2, decode_responses=True)
+
+
 @router.post("/", status_code =status.HTTP_201_CREATED, summary="Create driver coordinates")
-def create_driver_coords(driver_coords: schemas.DriverCoords, db: Session = Depends(get_db)):
+def create_driver_coords(driver_coords: schemas.DriverCoords, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     try:
         check_driver_coords = db.query(models.DriverCoords).filter(
             models.DriverCoords.id_driver == driver_coords.id_driver,
@@ -49,7 +62,7 @@ def get_driver_coords_by_location(country_code: str, region: str, db: Session = 
     return driver_coords
 
 @router.post("/process-pickup-nearest-driver/", status_code=status.HTTP_200_OK, summary="Process get all nearest  driver for pickup triggered by user")
-def get_driver_coords_by_pickup(request: schemas.DriverCoordsOut, db: Session = Depends(get_db)):
+def get_driver_coords_by_pickup(request: schemas.DriverCoordsOut, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     try:
         cursor = db.execute(
             f"""SELECT DC.*, 
@@ -76,7 +89,7 @@ def get_driver_coords_by_pickup(request: schemas.DriverCoordsOut, db: Session = 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e}")
 
 @router.delete("/{driver_id}/", status_code=status.HTTP_204_NO_CONTENT, summary="Delete driver coordinates")
-def delete_driver_coords(driver_id: int, db: Session = Depends(get_db)):
+def delete_driver_coords(driver_id: int, db: Session = Depends(get_db), payload=Depends(jwt_auth_wrapper)):
     db_driver_coords = db.query(models.DriverCoords).filter(models.DriverCoords.id_driver == driver_id).first()
     if not db_driver_coords:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver coordinates not found")
