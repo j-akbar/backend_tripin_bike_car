@@ -27,7 +27,7 @@ A basic boilerplate for FastAPI CRUD along with JWT Token Authentication. <br/>
 ```
 - for windows
 ```bash
-  Scripts\activate
+  ./Scripts/activate
 ```
 
 #### 3. Clone the code on machine
@@ -51,8 +51,15 @@ A basic boilerplate for FastAPI CRUD along with JWT Token Authentication. <br/>
 - [Uvicorn](https://www.uvicorn.org/)
 - [Python](https://www.python.org/)
 - [SqlAlchemy](https://www.sqlalchemy.org/)
+
+## Fixing
+1. socket io error or not found
+```bash
+  pip install fastapi-socketio
+```
+
 ## Contact
 
-Shavej Shaikh - [@github](https://github.com/shavejshaikh) [@linkedin](https://www.linkedin.com/in/shavejshaikh/)
+J. Akbar - [@github]() [@linkedin]()
 
-Project Link - [https://github.com/shavejshaikh/Fastapi_crud_jwt](https://github.com/shavejshaikh/Fastapi_crud_jwt)
+Project Link - [https://github.com/](https://github.com/)
